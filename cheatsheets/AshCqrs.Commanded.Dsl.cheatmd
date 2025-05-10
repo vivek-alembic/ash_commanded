@@ -1,0 +1,29 @@
+# AshCommanded.Commanded.Dsl Cheatsheet
+
+This is a placeholder cheatsheet that will be replaced by the auto-generated version when you run `mix spark.cheat_sheets`.
+
+## Commands
+
+```elixir
+command :create_user do
+  fields([:id, :name, :email])
+  identity_field(:id)
+end
+```
+
+## Events
+
+```elixir
+event :user_created do
+  fields([:id, :name, :email])
+end
+```
+
+## Projections
+
+```elixir
+projection :user_created do
+  action(:create)
+  changes(%{status: "active"})
+end
+```
