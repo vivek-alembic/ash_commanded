@@ -1,58 +1,7 @@
 defmodule AshCommanded.Commanded.Transformers.AppIntegrationTest do
   use ExUnit.Case, async: true
 
-  defmodule IntegrationResource do
-    use Ash.Resource,
-      extensions: [AshCommanded.Commanded.Dsl]
-
-    attributes do
-      uuid_primary_key :id
-      attribute :name, :string
-      attribute :status, :string
-    end
-
-    identities do
-      identity :unique_id, [:id]
-    end
-
-    commanded do
-      commands do
-        command :create_resource do
-          fields([:id, :name])
-          identity_field(:id)
-        end
-      end
-
-      events do
-        event :resource_created do
-          fields([:id, :name])
-        end
-      end
-
-      projections do
-        projection :resource_created do
-          action(:create)
-          changes(%{status: "active"})
-        end
-      end
-    end
-  end
-
-  defmodule IntegrationDomain do
-    use Ash.Domain
-
-    resources do
-      resource IntegrationResource
-    end
-
-    commanded do
-      application do
-        otp_app :integration_test
-        name IntegrationApp
-        event_store Commanded.EventStore.Adapters.InMemory
-      end
-    end
-  end
+  alias Test.Support.IntegrationResource
 
   test "application has proper structure and includes projectors" do
     # Application module is generated

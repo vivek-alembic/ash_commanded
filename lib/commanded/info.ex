@@ -110,7 +110,7 @@ defmodule AshCommanded.Commanded.Info do
       %{otp_app: :my_app}
   """
   def application_config(domain) do
-    Extension.get_opts(domain, @dsl_path ++ [:application])
+    Extension.get_opt(domain, @dsl_path ++ [:application], :config, %{})
   end
 
   @doc """
