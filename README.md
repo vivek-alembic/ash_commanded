@@ -64,31 +64,77 @@ AshCommanded is built as a DSL extension for Ash Framework resources. Its main c
 ## Usage Example
 
 ```elixir
-defmodule MyApp.User do
-  use Ash.Resource,
-    extensions: [AshCommanded.Commanded.Dsl]
+ defmodule MyApp.User do
+    use Ash.Resource,
+      extensions: [AshCommanded.Commanded.Dsl]
 
-  commanded do
-    commands do
-      command :register_user do
-        fields([:id, :email, :name])
-        identity_field(:id)
+    attributes do
+      uuid_primary_key :id
+      attribute :name, :string
+      attribute :email, :string
+      attribute :status, :atom, constraints: [one_of: [:pending, :active]]
+    end
+
+    identities do
+      identity :unique_id, [:id]
+    end
+
+    actions do
+      defaults [:read]
+
+      create :register do
+        accept [:name, :email]
+        change set_attribute(:status, :pending)
+      end
+
+      update :confirm_email do
+        accept []
+        change set_attribute(:status, :active)
       end
     end
 
-    events do
-      event :user_registered do
-        fields([:id, :email, :name])
-      end
-    end
+    commanded do
+      commands do
+        command :register_user do
+          fields([:id, :name, :email])
+          identity_field(:id)
+          action :register
+        end
 
-    projections do
-      projection :user_registered do
-        changes(%{status: :active})
+        command :confirm_email do
+          fields([:id])
+          identity_field(:id)
+          action :confirm_email
+        end
+      end
+
+      events do
+        event :user_registered do
+          fields([:id, :name, :email])
+        end
+
+        event :email_confirmed do
+          fields([:id])
+        end
+      end
+
+      projections do
+        projection :user_registered do
+          action(:create)
+          changes(%{
+            status: :pending
+          })
+        end
+
+        projection :email_confirmed do
+          action(:update_by_id)
+          changes(%{
+            status: :active
+          })
+        end
       end
     end
   end
-end
 ```
 
 This will generate:
@@ -122,36 +168,25 @@ The documentation includes:
 Commands define the actions that can be performed on your resources. AshCommanded generates command modules as structs with typespecs.
 
 ```elixir
-defmodule MyApp.User do
-  use Ash.Resource,
-    extensions: [AshCommanded.Commanded.Dsl]
+    commanded do
+      commands do
+        command :register_user do
+          fields([:id, :name, :email])
+          identity_field(:id)
+          action :register
+        end
 
-  commanded do
-    commands do
-      # Basic command with required fields
-      command :register_user do
-        fields([:id, :email, :name])
-        identity_field(:id)
-      end
-      
-      # Command with custom name and disabled handler
-      command :update_email do
-        fields([:id, :email])
-        command_name :ChangeUserEmail
-        autogenerate_handler? false
-      end
-      
-      # Command that maps to a specific Ash action
-      command :deactivate do
-        fields([:id])
-        action :mark_inactive
+        command :confirm_email do
+          fields([:id])
+          identity_field(:id)
+          action :confirm_email
+        end
       end
     end
-  end
-end
 ```
 
 Generated command modules include:
+
 - A struct with the specified fields
 - Typespecs for all fields
 - Standard module documentation
@@ -166,10 +201,11 @@ defmodule MyApp.Commands.RegisterUser do
   @type t :: %__MODULE__{
     id: String.t(),
     email: String.t(),
-    name: String.t()
+    name: String.t(),
+    status: atom()
   }
   
-  defstruct [:id, :email, :name]
+  defstruct [:id, :email, :name, :status]
 end
 ```
 
@@ -201,22 +237,14 @@ Handler options:
 Events represent facts that have occurred in your system. AshCommanded generates event modules as structs with typespecs.
 
 ```elixir
-defmodule MyApp.User do
-  use Ash.Resource,
-    extensions: [AshCommanded.Commanded.Dsl]
+commanded do
+  events do
+    event :user_registered do
+      fields([:id, :name, :email])
+    end
 
-  commanded do
-    events do
-      # Basic event with fields
-      event :user_registered do
-        fields([:id, :email, :name])
-      end
-      
-      # Event with custom module name
-      event :email_changed do
-        fields([:id, :email])
-        event_name :UserEmailUpdated
-      end
+    event :email_confirmed do
+      fields([:id])
     end
   end
 end
@@ -237,17 +265,18 @@ defmodule MyApp.Events.UserRegistered do
   @type t :: %__MODULE__{
     id: String.t(),
     email: String.t(),
-    name: String.t()
+    name: String.t(),
+    status: atom()
   }
   
-  defstruct [:id, :email, :name]
+  defstruct [:id, :email, :name, :status]
 end
 ```
 
-## Event Handlers (Aggregates)
+## Aggregates and Events-Handlers
 
-Event handlers in the form of Aggregates process events and update state. AshCommanded generates aggregate modules for each resource.
-
+Aggregates process events and update state. AshCommanded generates aggregate modules for each resource.
+Each event that mutate state is handled by the Aggregate via an apply function that is automatically generated for you.
 ```elixir
 defmodule MyApp.UserAggregate do
   defstruct [:id, :email, :name, :status]
@@ -275,31 +304,20 @@ The aggregate maintains the current state by applying events in sequence. Each e
 Projections define how events should update your read models. AshCommanded generates projection modules that handle specific event types.
 
 ```elixir
-defmodule MyApp.User do
-  use Ash.Resource,
-    extensions: [AshCommanded.Commanded.Dsl]
+commanded do
+  projections do
+    projection :user_registered do
+      action(:create)
+      changes(%{
+        status: :pending
+      })
+    end
 
-  commanded do
-    projections do
-      # Create a new record when user is registered
-      projection :user_registered do
-        action(:create)
-        changes(%{
-          status: "active",
-          registered_at: &DateTime.utc_now/0
-        })
-      end
-      
-      # Update specific fields when email changes
-      projection :email_changed do
-        action(:update_by_id)
-        changes(fn event ->
-          %{
-            email: event.email,
-            updated_at: DateTime.utc_now()
-          }
-        end)
-      end
+    projection :email_confirmed do
+      action(:update_by_id)
+      changes(%{
+        status: :active
+      })
     end
   end
 end

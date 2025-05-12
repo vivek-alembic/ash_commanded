@@ -9,7 +9,7 @@
     commanded do
       application do
         otp_app :integration_test
-        name IntegrationApp
+        name MyApp
         event_store Commanded.EventStore.Adapters.InMemory
       end
     end
