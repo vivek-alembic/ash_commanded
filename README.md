@@ -1,7 +1,9 @@
 
 ## Overview
 
-AshCommanded is an Elixir library that provides Command Query Responsibility Segregation (CQRS) and Event-Sourcing (ES) patterns for the Ash Framework. It extends Ash resources with a Commanded DSL that enables defining commands, events, and projections.
+AshCommanded is an Elixir library that provides Command Query Responsibility Segregation (CQRS) and Event-Sourcing (ES) patterns for the Ash Framework. It extends Ash resources with a Commanded DSL that enables defining commands, events, and projections. The extension relies on the excellent [Commanded](https://hexdocs.pm/commanded/Commanded.html) library. The Commanded Guides section explained the different concepts better than I could.
+
+Special thanks to [Ben Smith](https://github.com/slashdotdash) for the Commanded library and to [Barnabas J.] for letting me steal the library name.
 
 ## Build and Test Commands
 
@@ -308,6 +310,36 @@ Projection options:
 - `changes` - Static map or function that returns the changes to apply
 - `autogenerate?` - Set to false to disable projection generation
 
+
+## Projectors
+
+Projectors are Commanded event handlers that listen for domain events and update read models. AshCommanded automatically generates projector modules using the `GenerateProjectorModules` transformer. These projectors:
+
+1. Subscribe to specific event types defined in your resource
+2. Process events using the Commanded event handling system
+3. Apply changes to your resources via Ash actions (create, update, destroy)
+
+For example, a generated projector might look like:
+
+```elixir
+defmodule MyApp.Projectors.UserProjector do
+  use Commanded.Projections.Ecto, name: "MyApp.Projectors.UserProjector"
+
+  project(%MyApp.Events.UserRegistered{} = event, _metadata, fn _context ->
+    Ash.Changeset.new(MyApp.User, event)
+    |> Ash.Changeset.for_action(:create, %{status: "active"})
+    |> Ash.create()
+  end)
+  
+  # Functions to apply different action types
+  defp apply_action_fn(:create), do: &Ash.create/1
+  defp apply_action_fn(:update), do: &Ash.update/1
+  defp apply_action_fn(:destroy), do: &Ash.destroy/1
+end
+```
+
+You can customize the projector name with the `projector_name` option or disable automatic generation with `autogenerate?: false`.
+
 ## Router Usage
 
 The generated routers allow dispatching commands to their appropriate handlers:
@@ -346,31 +378,8 @@ This generates a Commanded application module that:
 - Provides a supervisor for all projectors
 - Can be added to your application's supervision tree
 
-## Projectors
+## Where are the Process Managers?
 
-Projectors are Commanded event handlers that listen for domain events and update read models. AshCommanded automatically generates projector modules using the `GenerateProjectorModules` transformer. These projectors:
+Process Managers in the Commanded are responsible for coordinating one or more aggregates. It handles events and dispatches commands in response. This is very business logic specific and would be rather difficult to generate appropriately. It is suggested to write your Process Managers using [Reactor](https://hexdocs.pm/reactor/readme.html) instead.
 
-1. Subscribe to specific event types defined in your resource
-2. Process events using the Commanded event handling system
-3. Apply changes to your resources via Ash actions (create, update, destroy)
 
-For example, a generated projector might look like:
-
-```elixir
-defmodule MyApp.Projectors.UserProjector do
-  use Commanded.Projections.Ecto, name: "MyApp.Projectors.UserProjector"
-
-  project(%MyApp.Events.UserRegistered{} = event, _metadata, fn _context ->
-    Ash.Changeset.new(MyApp.User, event)
-    |> Ash.Changeset.for_action(:create, %{status: "active"})
-    |> Ash.create()
-  end)
-  
-  # Functions to apply different action types
-  defp apply_action_fn(:create), do: &Ash.create/1
-  defp apply_action_fn(:update), do: &Ash.update/1
-  defp apply_action_fn(:destroy), do: &Ash.destroy/1
-end
-```
-
-You can customize the projector name with the `projector_name` option or disable automatic generation with `autogenerate?: false`.
