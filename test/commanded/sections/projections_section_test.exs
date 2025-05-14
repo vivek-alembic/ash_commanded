@@ -41,7 +41,7 @@ defmodule AshCommanded.Commanded.Sections.ProjectionsSectionTest do
       assert Keyword.get(schema[:name], :type) == :atom
       assert Keyword.get(schema[:event_name], :type) == :atom
       assert Keyword.get(schema[:action], :type) == :atom
-      assert Keyword.get(schema[:changes], :type) == {:or, [:map, :fun]}
+      assert Keyword.get(schema[:changes], :type) == {:or, [:map, :quoted]}
       assert Keyword.get(schema[:autogenerate?], :type) == :boolean
     end
   end

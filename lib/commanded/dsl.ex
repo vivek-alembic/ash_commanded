@@ -84,7 +84,8 @@ defmodule AshCommanded.Commanded.Dsl do
     sections: [@commanded_section],
     transformers: [
       AshCommanded.Commanded.Transformers.GenerateCommandModules,
-      AshCommanded.Commanded.Transformers.GenerateEventModules
+      AshCommanded.Commanded.Transformers.GenerateEventModules,
+      AshCommanded.Commanded.Transformers.GenerateProjectionModules
     ],
     verifiers: [
       AshCommanded.Commanded.Verifiers.ValidateCommandFields,

@@ -9,7 +9,9 @@ defmodule AshCommanded.Commanded.Transformers.IntegrationTest do
     use Spark.Dsl.Extension,
       sections: [AshCommanded.Commanded.Dsl.__sections__()],
       transformers: [
-        AshCommanded.Commanded.Transformers.GenerateCommandModules
+        AshCommanded.Commanded.Transformers.GenerateCommandModules,
+        AshCommanded.Commanded.Transformers.GenerateEventModules,
+        AshCommanded.Commanded.Transformers.GenerateProjectionModules
       ]
   end
   

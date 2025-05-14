@@ -8,7 +8,8 @@ defmodule AshCommanded.Commanded.Transformers.TransformerIntegrationTest do
       sections: [AshCommanded.Commanded.Dsl.__sections__()],
       transformers: [
         AshCommanded.Commanded.Transformers.GenerateCommandModules,
-        AshCommanded.Commanded.Transformers.GenerateEventModules
+        AshCommanded.Commanded.Transformers.GenerateEventModules,
+        AshCommanded.Commanded.Transformers.GenerateProjectionModules
       ]
   end
   

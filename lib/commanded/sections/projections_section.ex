@@ -25,9 +25,9 @@ defmodule AshCommanded.Commanded.Sections.ProjectionsSection do
         doc: "The Ash action to call when handling this event (e.g., :create, :update, :destroy)"
       ],
       changes: [
-        type: {:or, [:map, :fun]},
+        type: {:or, [:map, :quoted]},
         required: true,
-        doc: "The changes to apply to the resource when the event is received. Can be a static map or a function that accepts the event and returns a map."
+        doc: "The changes to apply to the resource when the event is received. Can be a static map or a function (in quoted form) that accepts the event and returns a map."
       ],
       autogenerate?: [
         type: :boolean,
