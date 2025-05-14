@@ -41,6 +41,7 @@ defmodule AshCommanded.MixProject do
       {:sourceror, "~> 1.8", only: [:dev, :test]},
       {:spark, "~> 2.0"},
       {:igniter, "~> 0.5", only: [:dev, :test]},
+      {:mock, "~> 0.3.0", only: [:test]},
       
       # Documentation
       {:ex_doc, "~> 0.30", only: [:dev, :test], runtime: false}

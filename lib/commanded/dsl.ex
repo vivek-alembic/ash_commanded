@@ -82,7 +82,7 @@ defmodule AshCommanded.Commanded.Dsl do
   # The main extension
   use Spark.Dsl.Extension,
     sections: [@commanded_section],
-    transformers: [],
+    transformers: [AshCommanded.Commanded.Transformers.GenerateCommandModules],
     verifiers: []
 
   @doc """
