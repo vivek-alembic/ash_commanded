@@ -68,6 +68,16 @@ defmodule AshCommanded.Commanded.Dsl do
     imports: []
   }
   
+  alias AshCommanded.Commanded.Sections.ApplicationSection
+  
+  @application_section %Spark.Dsl.Section{
+    name: :application,
+    describe: "Configure the Commanded application",
+    schema: ApplicationSection.schema(),
+    entities: ApplicationSection.entities(),
+    imports: []
+  }
+  
   # Top-level section that contains all other sections
   @commanded_section %Spark.Dsl.Section{
     name: :commanded,
@@ -75,7 +85,8 @@ defmodule AshCommanded.Commanded.Dsl do
     sections: [
       @commands_section,
       @events_section,
-      @projections_section
+      @projections_section,
+      @application_section
     ]
   }
   
@@ -89,7 +100,8 @@ defmodule AshCommanded.Commanded.Dsl do
       AshCommanded.Commanded.Transformers.GenerateProjectorModules,
       AshCommanded.Commanded.Transformers.GenerateAggregateModule,
       AshCommanded.Commanded.Transformers.GenerateDomainRouterModule,
-      AshCommanded.Commanded.Transformers.GenerateMainRouterModule
+      AshCommanded.Commanded.Transformers.GenerateMainRouterModule,
+      AshCommanded.Commanded.Transformers.GenerateCommandedApplication
     ],
     verifiers: [
       AshCommanded.Commanded.Verifiers.ValidateCommandFields,
@@ -126,5 +138,34 @@ defmodule AshCommanded.Commanded.Dsl do
   @spec __sections__() :: Spark.Dsl.Section.t()
   def __sections__() do
     @commanded_section
+  end
+
+  @doc """
+  Get the application configuration from the DSL.
+
+  ## Parameters
+
+  * `dsl` - The DSL state.
+
+  ## Returns
+
+  A keyword list of application configuration options, or nil if no application configuration is defined.
+
+  ## Examples
+
+      iex> application(dsl)
+      [otp_app: :my_app, event_store: Commanded.EventStore.Adapters.InMemory]
+      
+      iex> application(dsl_without_app_config)
+      nil
+  """
+  @spec application(Spark.Dsl.t()) :: keyword() | nil
+  def application(dsl) do
+    opts = Spark.Dsl.Extension.get_opt(dsl, [:commanded, :application], nil, nil)
+    
+    case opts do
+      nil -> nil
+      opts -> opts
+    end
   end
 end

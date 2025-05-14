@@ -3,6 +3,8 @@ defmodule AshCommanded.Commanded.Transformers.TransformerOrderTest do
   
   alias AshCommanded.Commanded.Transformers.GenerateCommandModules
   alias AshCommanded.Commanded.Transformers.GenerateEventModules
+  alias AshCommanded.Commanded.Transformers.GenerateMainRouterModule
+  alias AshCommanded.Commanded.Transformers.GenerateCommandedApplication
   
   describe "transformer ordering" do
     test "event module transformer runs after command module transformer" do
@@ -25,6 +27,17 @@ defmodule AshCommanded.Commanded.Transformers.TransformerOrderTest do
       # For completeness, check that transformers don't need to run after themselves
       refute GenerateCommandModules.after?(GenerateCommandModules)
       refute GenerateEventModules.after?(GenerateEventModules)
+    end
+    
+    test "commanded application transformer runs after main router transformer" do
+      # Check that the application transformer is configured to run after main router transformer
+      assert GenerateCommandedApplication.after?(GenerateMainRouterModule)
+      
+      # Main router transformer should not be configured to run after application transformer
+      refute GenerateMainRouterModule.after?(GenerateCommandedApplication)
+      
+      # For completeness, check that transformers don't need to run after themselves
+      refute GenerateCommandedApplication.after?(GenerateCommandedApplication)
     end
   end
 end

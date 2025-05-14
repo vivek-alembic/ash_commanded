@@ -1,7 +1,18 @@
 # Set up test environment
+
+# Check if Commanded is available
+commanded_available? = Code.ensure_loaded?(Commanded.Application)
+
+# Configure ExUnit
+exclude_tags = 
+  if commanded_available? do
+    [:skip]
+  else
+    [:skip, :skip_if_no_commanded]
+  end
+
 ExUnit.configure(
-  # These are just examples of config options you might use
-  exclude: [:skip],
+  exclude: exclude_tags,
   trace: false,
   seed: 0
 )
