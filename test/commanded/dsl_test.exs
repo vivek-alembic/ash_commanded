@@ -29,9 +29,6 @@ defmodule AshCommanded.Commanded.DslTest do
       
       projections do
       end
-      
-      application do
-      end
     end
   end
 

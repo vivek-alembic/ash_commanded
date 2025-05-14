@@ -68,16 +68,6 @@ defmodule AshCommanded.Commanded.Dsl do
     imports: []
   }
   
-  alias AshCommanded.Commanded.Sections.ApplicationSection
-  
-  @application_section %Spark.Dsl.Section{
-    name: :application,
-    describe: "Configure Commanded application settings",
-    schema: ApplicationSection.schema(),
-    entities: ApplicationSection.entities(),
-    imports: []
-  }
-  
   # Top-level section that contains all other sections
   @commanded_section %Spark.Dsl.Section{
     name: :commanded,
@@ -85,8 +75,7 @@ defmodule AshCommanded.Commanded.Dsl do
     sections: [
       @commands_section,
       @events_section,
-      @projections_section,
-      @application_section
+      @projections_section
     ]
   }
   
