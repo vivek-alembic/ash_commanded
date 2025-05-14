@@ -7,7 +7,7 @@ Commands in AshCommanded represent intentions to change the state of your applic
 Commands are defined in the `commanded` DSL extension for Ash resources:
 
 ```elixir
-defmodule MyApp.User do
+defmodule ECommerce.Customer do
   use Ash.Resource,
     extensions: [AshCommanded.Commanded.Dsl]
 
@@ -20,7 +20,7 @@ defmodule MyApp.User do
 
   commanded do
     commands do
-      command :register_user do
+      command :register_customer do
         fields([:id, :email, :name])
         identity_field(:id)
       end
@@ -49,12 +49,10 @@ Each command can have the following options:
 For each command, AshCommanded generates a command module:
 
 ```elixir
-defmodule MyApp.Commands.RegisterUser do
+defmodule ECommerce.Commands.RegisterCustomer do
   @moduledoc """
-  Command for registering a new user
+  Command for registering a new customer
   """
-
-  use Ash.Resource.Commands.Command
 
   @type t :: %__MODULE__{
     id: String.t(),
@@ -71,15 +69,15 @@ end
 AshCommanded automatically generates command handlers that invoke the corresponding Ash actions:
 
 ```elixir
-defmodule AshCommanded.Commanded.CommandHandlers.UserHandler do
+defmodule AshCommanded.Commanded.CommandHandlers.CustomerHandler do
   @behaviour Commanded.Commands.Handler
 
-  def handle(%MyApp.Commands.RegisterUser{} = cmd, _metadata) do
-    Ash.run_action(MyApp.User, :register_user, Map.from_struct(cmd))
+  def handle(%ECommerce.Commands.RegisterCustomer{} = cmd, _metadata) do
+    Ash.run_action(ECommerce.Customer, :register_customer, Map.from_struct(cmd))
   end
 
-  def handle(%MyApp.Commands.UpdateStatus{} = cmd, _metadata) do
-    Ash.run_action(MyApp.User, :update_status, Map.from_struct(cmd))
+  def handle(%ECommerce.Commands.UpdateStatus{} = cmd, _metadata) do
+    Ash.run_action(ECommerce.Customer, :update_status, Map.from_struct(cmd))
   end
 end
 ```

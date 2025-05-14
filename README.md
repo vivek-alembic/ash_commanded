@@ -64,86 +64,86 @@ AshCommanded is built as a DSL extension for Ash Framework resources. Its main c
 ## Usage Example
 
 ```elixir
- defmodule MyApp.User do
-    use Ash.Resource,
-      extensions: [AshCommanded.Commanded.Dsl]
+defmodule ECommerce.Customer do
+  use Ash.Resource,
+    extensions: [AshCommanded.Commanded.Dsl]
 
-    attributes do
-      uuid_primary_key :id
-      attribute :name, :string
-      attribute :email, :string
-      attribute :status, :atom, constraints: [one_of: [:pending, :active]]
+  attributes do
+    uuid_primary_key :id
+    attribute :name, :string
+    attribute :email, :string
+    attribute :status, :atom, constraints: [one_of: [:pending, :active]]
+  end
+
+  identities do
+    identity :unique_id, [:id]
+  end
+
+  actions do
+    defaults [:read]
+
+    create :register do
+      accept [:name, :email]
+      change set_attribute(:status, :pending)
     end
 
-    identities do
-      identity :unique_id, [:id]
+    update :confirm_email do
+      accept []
+      change set_attribute(:status, :active)
+    end
+  end
+
+  commanded do
+    commands do
+      command :register_customer do
+        fields([:id, :name, :email])
+        identity_field(:id)
+        action :register
+      end
+
+      command :confirm_email do
+        fields([:id])
+        identity_field(:id)
+        action :confirm_email
+      end
     end
 
-    actions do
-      defaults [:read]
-
-      create :register do
-        accept [:name, :email]
-        change set_attribute(:status, :pending)
+    events do
+      event :customer_registered do
+        fields([:id, :name, :email])
       end
 
-      update :confirm_email do
-        accept []
-        change set_attribute(:status, :active)
+      event :email_confirmed do
+        fields([:id])
       end
     end
 
-    commanded do
-      commands do
-        command :register_user do
-          fields([:id, :name, :email])
-          identity_field(:id)
-          action :register
-        end
-
-        command :confirm_email do
-          fields([:id])
-          identity_field(:id)
-          action :confirm_email
-        end
+    projections do
+      projection :customer_registered do
+        action(:create)
+        changes(%{
+          status: :pending
+        })
       end
 
-      events do
-        event :user_registered do
-          fields([:id, :name, :email])
-        end
-
-        event :email_confirmed do
-          fields([:id])
-        end
-      end
-
-      projections do
-        projection :user_registered do
-          action(:create)
-          changes(%{
-            status: :pending
-          })
-        end
-
-        projection :email_confirmed do
-          action(:update_by_id)
-          changes(%{
-            status: :active
-          })
-        end
+      projection :email_confirmed do
+        action(:update_by_id)
+        changes(%{
+          status: :active
+        })
       end
     end
   end
+end
 ```
 
 This will generate:
-- `MyApp.Commands.RegisterUser` - Command struct
-- `MyApp.Events.UserRegistered` - Event struct
-- `MyApp.Projections.UserRegistered` - Projection definition
-- `MyApp.Projectors.UserProjector` - Commanded event handler for projections
-- `MyApp.UserAggregate` - Aggregate module
-- `MyApp.Domain.Router` - Domain-specific router (if in an Ash.Domain)
+- `ECommerce.Commands.RegisterCustomer` - Command struct
+- `ECommerce.Events.CustomerRegistered` - Event struct
+- `ECommerce.Projections.CustomerRegistered` - Projection definition
+- `ECommerce.Projectors.CustomerProjector` - Commanded event handler for projections
+- `ECommerce.CustomerAggregate` - Aggregate module
+- `ECommerce.Store.Router` - Domain-specific router (if in an Ash.Domain)
 - `AshCommanded.Router` - Main application router
 
 ## Documentation
@@ -168,21 +168,21 @@ The documentation includes:
 Commands define the actions that can be performed on your resources. AshCommanded generates command modules as structs with typespecs.
 
 ```elixir
-    commanded do
-      commands do
-        command :register_user do
-          fields([:id, :name, :email])
-          identity_field(:id)
-          action :register
-        end
-
-        command :confirm_email do
-          fields([:id])
-          identity_field(:id)
-          action :confirm_email
-        end
-      end
+commanded do
+  commands do
+    command :register_customer do
+      fields([:id, :name, :email])
+      identity_field(:id)
+      action :register
     end
+
+    command :confirm_email do
+      fields([:id])
+      identity_field(:id)
+      action :confirm_email
+    end
+  end
+end
 ```
 
 Generated command modules include:
@@ -193,9 +193,9 @@ Generated command modules include:
 
 Example generated command:
 ```elixir
-defmodule MyApp.Commands.RegisterUser do
+defmodule ECommerce.Commands.RegisterCustomer do
   @moduledoc """
-  Command for registering a new user
+  Command for registering a new customer
   """
   
   @type t :: %__MODULE__{
@@ -214,15 +214,15 @@ end
 Command handlers are modules that process commands and apply business logic. AshCommanded generates handler modules that invoke Ash actions.
 
 ```elixir
-defmodule AshCommanded.Commanded.CommandHandlers.UserHandler do
+defmodule AshCommanded.Commanded.CommandHandlers.CustomerHandler do
   @behaviour Commanded.Commands.Handler
   
-  def handle(%MyApp.Commands.RegisterUser{} = cmd, _metadata) do
-    Ash.run_action(MyApp.User, :register_user, Map.from_struct(cmd))
+  def handle(%ECommerce.Commands.RegisterCustomer{} = cmd, _metadata) do
+    Ash.run_action(ECommerce.Customer, :register, Map.from_struct(cmd))
   end
   
-  def handle(%MyApp.Commands.DeactivateUser{} = cmd, _metadata) do
-    Ash.run_action(MyApp.User, :mark_inactive, Map.from_struct(cmd))
+  def handle(%ECommerce.Commands.ConfirmEmail{} = cmd, _metadata) do
+    Ash.run_action(ECommerce.Customer, :confirm_email, Map.from_struct(cmd))
   end
 end
 ```
@@ -239,7 +239,7 @@ Events represent facts that have occurred in your system. AshCommanded generates
 ```elixir
 commanded do
   events do
-    event :user_registered do
+    event :customer_registered do
       fields([:id, :name, :email])
     end
 
@@ -257,9 +257,9 @@ Generated event modules include:
 
 Example generated event:
 ```elixir
-defmodule MyApp.Events.UserRegistered do
+defmodule ECommerce.Events.CustomerRegistered do
   @moduledoc """
-  Event emitted when a user is registered
+  Event emitted when a customer is registered
   """
   
   @type t :: %__MODULE__{
@@ -278,11 +278,11 @@ end
 Aggregates process events and update state. AshCommanded generates aggregate modules for each resource.
 Each event that mutate state is handled by the Aggregate via an apply function that is automatically generated for you.
 ```elixir
-defmodule MyApp.UserAggregate do
+defmodule ECommerce.CustomerAggregate do
   defstruct [:id, :email, :name, :status]
   
   # Apply event to update the aggregate state
-  def apply(%__MODULE__{} = state, %MyApp.Events.UserRegistered{} = event) do
+  def apply(%__MODULE__{} = state, %ECommerce.Events.CustomerRegistered{} = event) do
     %__MODULE__{
       state |
       id: event.id,
@@ -291,8 +291,8 @@ defmodule MyApp.UserAggregate do
     }
   end
   
-  def apply(%__MODULE__{} = state, %MyApp.Events.UserEmailUpdated{} = event) do
-    %__MODULE__{state | email: event.email}
+  def apply(%__MODULE__{} = state, %ECommerce.Events.EmailConfirmed{} = event) do
+    %__MODULE__{state | status: :active}
   end
 end
 ```
@@ -306,7 +306,7 @@ Projections define how events should update your read models. AshCommanded gener
 ```elixir
 commanded do
   projections do
-    projection :user_registered do
+    projection :customer_registered do
       action(:create)
       changes(%{
         status: :pending
@@ -340,13 +340,19 @@ Projectors are Commanded event handlers that listen for domain events and update
 For example, a generated projector might look like:
 
 ```elixir
-defmodule MyApp.Projectors.UserProjector do
-  use Commanded.Projections.Ecto, name: "MyApp.Projectors.UserProjector"
+defmodule ECommerce.Projectors.CustomerProjector do
+  use Commanded.Projections.Ecto, name: "ECommerce.Projectors.CustomerProjector"
 
-  project(%MyApp.Events.UserRegistered{} = event, _metadata, fn _context ->
-    Ash.Changeset.new(MyApp.User, event)
-    |> Ash.Changeset.for_action(:create, %{status: "active"})
+  project(%ECommerce.Events.CustomerRegistered{} = event, _metadata, fn _context ->
+    Ash.Changeset.new(ECommerce.Customer, event)
+    |> Ash.Changeset.for_action(:create, %{status: :pending})
     |> Ash.create()
+  end)
+  
+  project(%ECommerce.Events.EmailConfirmed{} = event, _metadata, fn _context ->
+    Ash.Changeset.new(ECommerce.Customer, %{id: event.id})
+    |> Ash.Changeset.for_action(:update, %{status: :active})
+    |> Ash.update()
   end)
   
   # Functions to apply different action types
@@ -364,7 +370,7 @@ The generated routers allow dispatching commands to their appropriate handlers:
 
 ```elixir
 # Dispatch a command through the main router
-command = %MyApp.Commands.RegisterUser{id: "123", email: "user@example.com", name: "Test User"}
+command = %ECommerce.Commands.RegisterCustomer{id: "123", email: "customer@example.com", name: "John Doe"}
 AshCommanded.Router.dispatch(command)
 ```
 
@@ -373,17 +379,19 @@ AshCommanded.Router.dispatch(command)
 The `application` section in the DSL allows configuring a Commanded application at the domain level:
 
 ```elixir
-defmodule MyApp.Domain do
-  use Ash.Domain
+defmodule ECommerce.Store do
+  use Ash.Domain, extensions: [AshCommanded.Commanded.Dsl]
 
   resources do
-    resource MyApp.User
+    resource ECommerce.Product
+    resource ECommerce.Customer
+    resource ECommerce.Order
   end
 
   commanded do
     application do
-      otp_app :my_app
-      event_store Commanded.EventStore.Adapters.InMemory
+      otp_app :ecommerce
+      event_store Commanded.EventStore.Adapters.EventStore
       include_supervisor? true
     end
   end

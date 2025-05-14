@@ -7,7 +7,7 @@ Events in AshCommanded represent facts that have occurred in your system. They a
 Events are defined in the `commanded` DSL extension for Ash resources:
 
 ```elixir
-defmodule MyApp.User do
+defmodule ECommerce.Customer do
   use Ash.Resource,
     extensions: [AshCommanded.Commanded.Dsl]
 
@@ -20,11 +20,11 @@ defmodule MyApp.User do
 
   commanded do
     events do
-      event :user_registered do
+      event :customer_registered do
         fields([:id, :email, :name])
       end
 
-      event :user_status_updated do
+      event :customer_status_updated do
         fields([:id, :status])
       end
     end
@@ -44,9 +44,9 @@ Each event can have the following options:
 For each event, AshCommanded generates an event module:
 
 ```elixir
-defmodule MyApp.Events.UserRegistered do
+defmodule ECommerce.Events.CustomerRegistered do
   @moduledoc """
-  Event emitted when a user is registered
+  Event emitted when a customer is registered
   """
 
   @type t :: %__MODULE__{
@@ -64,10 +64,10 @@ end
 In the aggregate module, AshCommanded generates `apply/2` functions for each event to update the aggregate state:
 
 ```elixir
-defmodule MyApp.UserAggregate do
+defmodule ECommerce.CustomerAggregate do
   defstruct [:id, :email, :name, :status]
 
-  def apply(%__MODULE__{} = state, %MyApp.Events.UserRegistered{} = event) do
+  def apply(%__MODULE__{} = state, %ECommerce.Events.CustomerRegistered{} = event) do
     %__MODULE__{
       state |
       id: event.id,
@@ -76,7 +76,7 @@ defmodule MyApp.UserAggregate do
     }
   end
 
-  def apply(%__MODULE__{} = state, %MyApp.Events.UserStatusUpdated{} = event) do
+  def apply(%__MODULE__{} = state, %ECommerce.Events.CustomerStatusUpdated{} = event) do
     %__MODULE__{
       state |
       status: event.status
