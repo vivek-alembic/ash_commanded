@@ -82,8 +82,14 @@ defmodule AshCommanded.Commanded.Dsl do
   # The main extension
   use Spark.Dsl.Extension,
     sections: [@commanded_section],
-    transformers: [AshCommanded.Commanded.Transformers.GenerateCommandModules],
-    verifiers: []
+    transformers: [
+      AshCommanded.Commanded.Transformers.GenerateCommandModules,
+      AshCommanded.Commanded.Transformers.GenerateEventModules
+    ],
+    verifiers: [
+      AshCommanded.Commanded.Verifiers.ValidateCommandFields,
+      AshCommanded.Commanded.Verifiers.ValidateCommandNames
+    ]
 
   @doc """
   Determine if a resource uses the `commanded` extension.
