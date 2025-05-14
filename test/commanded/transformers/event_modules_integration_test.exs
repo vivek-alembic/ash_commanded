@@ -5,8 +5,8 @@ defmodule AshCommanded.Commanded.Transformers.EventModulesIntegrationTest do
   
   describe "event module generation" do
     test "transformer is properly configured" do
-      # Verify the transformer function exists
-      assert function_exported?(GenerateEventModules, :transform, 1)
+      # Verify the transformer implements the Spark.Dsl.Transformer behaviour
+      assert Spark.implements_behaviour?(GenerateEventModules, Spark.Dsl.Transformer)
     end
   end
 end

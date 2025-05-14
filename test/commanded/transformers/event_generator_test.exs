@@ -3,7 +3,6 @@ defmodule AshCommanded.Commanded.Transformers.EventGeneratorTest do
   
   alias AshCommanded.Commanded.Event
   alias AshCommanded.Commanded.Transformers.GenerateEventModules
-  alias AshCommanded.Commanded.Transformers.BaseTransformer
   
   describe "event module generation helpers" do
     test "builds correct module names" do

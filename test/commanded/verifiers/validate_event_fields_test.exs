@@ -1,18 +1,18 @@
-defmodule AshCommanded.Commanded.Verifiers.ValidateCommandFieldsTest do
+defmodule AshCommanded.Commanded.Verifiers.ValidateEventFieldsTest do
   use ExUnit.Case, async: false
   @moduletag :verifier_test
   
-  alias AshCommanded.Commanded.Command
-  alias AshCommanded.Commanded.Verifiers.ValidateCommandFields
+  alias AshCommanded.Commanded.Event
+  alias AshCommanded.Commanded.Verifiers.ValidateEventFields
   alias Spark.Dsl.Verifier
   
   import Mock
   
   describe "verify/1" do
-    test "returns :ok when all command fields are valid resource attributes" do
-      # Create mock commands with valid fields
-      command = %Command{
-        name: :register_user,
+    test "returns :ok when all event fields are valid resource attributes" do
+      # Create mock events with valid fields
+      event = %Event{
+        name: :user_registered,
         fields: [:id, :email, :name]
       }
       
@@ -20,7 +20,7 @@ defmodule AshCommanded.Commanded.Verifiers.ValidateCommandFieldsTest do
       with_mock Verifier, [
         get_persisted: fn _state, :module -> TestResource end,
         get_entities: fn 
-          _state, [:commanded, :commands] -> [command]
+          _state, [:commanded, :events] -> [event]
           _state, [:attributes] -> [
             %{name: :id}, 
             %{name: :email}, 
@@ -28,14 +28,14 @@ defmodule AshCommanded.Commanded.Verifiers.ValidateCommandFieldsTest do
           ]
         end
       ] do
-        assert ValidateCommandFields.verify(%{}) == :ok
+        assert ValidateEventFields.verify(%{}) == :ok
       end
     end
     
-    test "returns an error when a command has fields that don't exist in the resource" do
-      # Create mock commands with invalid fields
-      command = %Command{
-        name: :register_user,
+    test "returns an error when an event has fields that don't exist in the resource" do
+      # Create mock events with invalid fields
+      event = %Event{
+        name: :user_registered,
         fields: [:id, :email, :nonexistent_field]
       }
       
@@ -43,7 +43,7 @@ defmodule AshCommanded.Commanded.Verifiers.ValidateCommandFieldsTest do
       with_mock Verifier, [
         get_persisted: fn _state, :module -> TestResource end,
         get_entities: fn 
-          _state, [:commanded, :commands] -> [command]
+          _state, [:commanded, :events] -> [event]
           _state, [:attributes] -> [
             %{name: :id}, 
             %{name: :email}, 
@@ -51,22 +51,22 @@ defmodule AshCommanded.Commanded.Verifiers.ValidateCommandFieldsTest do
           ]
         end
       ] do
-        result = ValidateCommandFields.verify(%{})
+        result = ValidateEventFields.verify(%{})
         assert {:error, error} = result
-        assert error.message =~ "Command `register_user` has unknown fields"
+        assert error.message =~ "Event `user_registered` has unknown fields"
         assert error.message =~ ":nonexistent_field"
       end
     end
     
-    test "includes all commands with invalid fields in the error message" do
-      # Create multiple mock commands with invalid fields
-      command1 = %Command{
-        name: :register_user,
+    test "includes all events with invalid fields in the error message" do
+      # Create multiple mock events with invalid fields
+      event1 = %Event{
+        name: :user_registered,
         fields: [:id, :email, :nonexistent_field1]
       }
       
-      command2 = %Command{
-        name: :update_user,
+      event2 = %Event{
+        name: :user_updated,
         fields: [:id, :nonexistent_field2]
       }
       
@@ -74,7 +74,7 @@ defmodule AshCommanded.Commanded.Verifiers.ValidateCommandFieldsTest do
       with_mock Verifier, [
         get_persisted: fn _state, :module -> TestResource end,
         get_entities: fn 
-          _state, [:commanded, :commands] -> [command1, command2]
+          _state, [:commanded, :events] -> [event1, event2]
           _state, [:attributes] -> [
             %{name: :id}, 
             %{name: :email}, 
@@ -82,11 +82,11 @@ defmodule AshCommanded.Commanded.Verifiers.ValidateCommandFieldsTest do
           ]
         end
       ] do
-        result = ValidateCommandFields.verify(%{})
+        result = ValidateEventFields.verify(%{})
         assert {:error, error} = result
-        assert error.message =~ "Command `register_user` has unknown fields"
+        assert error.message =~ "Event `user_registered` has unknown fields"
         assert error.message =~ ":nonexistent_field1"
-        assert error.message =~ "Command `update_user` has unknown fields"
+        assert error.message =~ "Event `user_updated` has unknown fields"
         assert error.message =~ ":nonexistent_field2"
       end
     end

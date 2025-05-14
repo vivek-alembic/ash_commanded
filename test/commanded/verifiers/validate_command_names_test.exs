@@ -1,5 +1,6 @@
 defmodule AshCommanded.Commanded.Verifiers.ValidateCommandNamesTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
+  @moduletag :verifier_test
   
   alias AshCommanded.Commanded.Command
   alias AshCommanded.Commanded.Verifiers.ValidateCommandNames

@@ -3,10 +3,20 @@ defmodule AshCommanded.Commanded.Transformers.IntegrationTest do
   
   alias AshCommanded.Commanded.Transformers.GenerateCommandModules
   
+  # Define a test module with a custom modified version of the DSL extension
+  # This avoids conflicts with the mock verifiers in other tests
+  defmodule CustomDsl do
+    use Spark.Dsl.Extension,
+      sections: [AshCommanded.Commanded.Dsl.__sections__()],
+      transformers: [
+        AshCommanded.Commanded.Transformers.GenerateCommandModules
+      ]
+  end
+  
   describe "command module generation" do
     defmodule TestResource do
       use Ash.Resource,
-        extensions: [AshCommanded.Commanded.Dsl],
+        extensions: [CustomDsl],
         domain: nil
       
       attributes do

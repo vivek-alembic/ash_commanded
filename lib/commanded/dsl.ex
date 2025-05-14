@@ -88,7 +88,9 @@ defmodule AshCommanded.Commanded.Dsl do
     ],
     verifiers: [
       AshCommanded.Commanded.Verifiers.ValidateCommandFields,
-      AshCommanded.Commanded.Verifiers.ValidateCommandNames
+      AshCommanded.Commanded.Verifiers.ValidateCommandNames,
+      AshCommanded.Commanded.Verifiers.ValidateEventFields,
+      AshCommanded.Commanded.Verifiers.ValidateEventNames
     ]
 
   @doc """
@@ -106,5 +108,15 @@ defmodule AshCommanded.Commanded.Dsl do
   def extension?(resource) do
     extensions = Spark.extensions(resource)
     __MODULE__ in extensions
+  end
+  
+  @doc """
+  Return the section definitions for use in custom DSL extensions.
+  
+  This is used in tests to create custom DSL extensions without verifiers.
+  """
+  @spec __sections__() :: Spark.Dsl.Section.t()
+  def __sections__() do
+    @commanded_section
   end
 end

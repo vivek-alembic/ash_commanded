@@ -5,6 +5,8 @@ defmodule AshCommanded.Commanded.Transformers.GenerateCommandModules do
   For each command defined in a resource, this transformer will generate a corresponding module
   with the command name as a struct with the specified fields.
   
+  This transformer should run before any other code generation transformers.
+  
   ## Example
   
   Given a resource with the following command:
@@ -36,6 +38,14 @@ defmodule AshCommanded.Commanded.Transformers.GenerateCommandModules do
   use Spark.Dsl.Transformer
   alias Spark.Dsl.Transformer
   alias AshCommanded.Commanded.Transformers.BaseTransformer
+  alias AshCommanded.Commanded.Transformers.GenerateEventModules
+  
+  @doc """
+  Specifies that this transformer should run before the event module transformer.
+  """
+  @impl true
+  def before?(GenerateEventModules), do: true
+  def before?(_), do: false
   
   @doc """
   Transforms the DSL state to generate command modules.
