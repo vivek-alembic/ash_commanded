@@ -68,11 +68,13 @@ defmodule AshCommanded.Commanded.Dsl do
     imports: []
   }
   
+  alias AshCommanded.Commanded.Sections.ApplicationSection
+  
   @application_section %Spark.Dsl.Section{
     name: :application,
     describe: "Configure Commanded application settings",
-    schema: [],
-    entities: [],
+    schema: ApplicationSection.schema(),
+    entities: ApplicationSection.entities(),
     imports: []
   }
   
