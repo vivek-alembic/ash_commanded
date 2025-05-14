@@ -1,67 +1,79 @@
 defmodule AshCommanded.Commanded.Sections.ApplicationSection do
-  @moduledoc false
-
-  def build do
-    %Spark.Dsl.Section{
-      name: :application,
-      describe: "Configuration for the Commanded application.",
-      schema: [
-        otp_app: [
-          type: :atom,
-          required: false,
-          doc: "The OTP application name. Defaults to :ash_commanded if not provided."
-        ],
-        name: [
-          type: :atom,
-          required: false,
-          doc: "The name of the generated application module. Defaults to {DomainName}CommandedApp."
-        ],
-        event_store: [
-          type: {:one_of, [:module, :atom]},
-          required: false,
-          doc: "Event store adapter to use. Defaults to EventStore.Adapters.InMemory."
-        ],
-        pubsub: [
-          type: :module,
-          required: false,
-          doc: "PubSub adapter to use for broadcasting events."
-        ],
-        registry: [
-          type: {:one_of, [:atom, {:tuple, [:atom, :atom, :atom]}]},
-          required: false,
-          doc: "Process registry. Defaults to Commanded.Registration.SwarmRegistry."
-        ],
-        snapshotting: [
-          type: :boolean,
-          default: false,
-          doc: "Whether to use snapshotting for aggregates."
-        ],
-        snapshot_every: [
-          type: :integer,
-          required: false,
-          doc: "Take a snapshot every number of events. Requires snapshotting to be enabled."
-        ],
-        snapshot_version: [
-          type: :integer,
-          required: false,
-          doc: "Snapshot version, use to upgrade snapshots."
-        ],
-        registered_name: [
-          type: :atom,
-          required: false,
-          doc: "Register the application process with the given name."
-        ],
-        include_supervisor?: [
-          type: :boolean,
-          default: true,
-          doc: "Whether to include a supervisor for all projectors. Default is true."
-        ],
-        include_application_module?: [
-          type: :boolean,
-          default: true,
-          doc: "Whether to generate an application module. Default is true."
-        ]
-      ]
-    }
+  @moduledoc """
+  Defines the schema for the `application` section of the Commanded DSL.
+  
+  The application section allows configuring a Commanded application for an Ash domain,
+  specifying settings such as the event store adapter, pubsub mechanism, and registry.
+  
+  ## Example
+  
+  ```elixir
+  defmodule MyApp.Domain do
+    use Ash.Domain
+    
+    commanded do
+      application do
+        otp_app :my_app
+        event_store Commanded.EventStore.Adapters.EventStore
+        pubsub :local
+        registry :local
+        include_supervisor? true
+        prefix "MyApp"
+      end
+    end
+    
+    # resources...
   end
+  ```
+  """
+  
+  @doc """
+  Returns the schema for the application section.
+  """
+  def schema do
+    [
+      otp_app: [
+        type: :atom,
+        doc: "The OTP application name to use for configuration",
+        required: true
+      ],
+      event_store: [
+        type: {:or, [:atom, :keyword_list, {:tuple, [:atom, :keyword_list]}]},
+        doc: "The event store adapter to use (e.g., Commanded.EventStore.Adapters.EventStore)",
+        required: true
+      ],
+      pubsub: [
+        type: :atom,
+        doc: "The pub/sub adapter to use (:local, :phoenix)",
+        default: :local
+      ],
+      registry: [
+        type: :atom,
+        doc: "The registry adapter to use (:local, :global)",
+        default: :local
+      ],
+      snapshotting: [
+        type: :keyword_list,
+        doc: "Configuration for aggregate snapshotting",
+        default: []
+      ],
+      include_supervisor?: [
+        type: :boolean,
+        doc: "Whether to include a supervisor for the application",
+        default: false
+      ],
+      prefix: [
+        type: :string,
+        doc: "Application module prefix for generated code",
+        default: nil
+      ]
+    ]
+  end
+  
+  @doc """
+  Returns the entities for the application section.
+  
+  The application section doesn't define entities, only configuration options.
+  """
+  def entities, do: []
 end

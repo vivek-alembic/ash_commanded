@@ -1,19 +1,19 @@
 defmodule AshCommanded.Commanded.Event do
   @moduledoc """
-  Struct for representing a Commanded event in the DSL.
+  Represents an event in the Commanded DSL.
+  
+  Events represent facts that have occurred in the system and are emitted by commands.
   """
-
-  defstruct [
-    :name, 
-    :fields, 
-    :event_name, 
-    autogenerate?: true
-  ]
-
+  
   @type t :: %__MODULE__{
-          name: atom,
-          fields: [atom],
-          event_name: atom | nil,
-          autogenerate?: boolean
-        }
+    name: atom(),
+    fields: [atom()],
+    event_name: atom() | nil
+  }
+  
+  defstruct [
+    :name,
+    :fields,
+    :event_name
+  ]
 end

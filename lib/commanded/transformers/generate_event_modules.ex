@@ -1,99 +1,140 @@
 defmodule AshCommanded.Commanded.Transformers.GenerateEventModules do
   @moduledoc """
-  Generates Elixir modules for each defined event in the DSL.
-
-  Each event becomes a module with a `defstruct` and typespec under:
-  `YourApp.YourResource.Events.<EventName>`
-
-  ## Example Generated Module
-
-      defmodule MyApp.Accounts.Events.UserRegistered do
-        @moduledoc "Event module for :user_registered"
-        defstruct [:id, :email, :name]
-
-        @type t :: %__MODULE__{
-                id: term(),
-                email: term(),
-                name: term()
-              }
-      end
-
-  You can customize the base namespace by setting the `@event_namespace` module attribute
-  on the resource module, or override per-event using:
-
-  - `event_name: :CustomName` to control the generated module name
-  - `autogenerate?: false` to skip code generation for that event
-  """
-
-  @behaviour Spark.Dsl.Transformer
-
-  alias AshCommanded.Commanded.Info
-
-  @impl true
-  def transform(resource) do
-    events = Info.events(resource) |> Enum.reject(&(&1[:autogenerate?] == false))
-
-    validate_unique_event_modules!(resource, events)
-    generate_events(resource, events)
-
-    {:ok, resource}
+  Generates event modules based on the events defined in the DSL.
+  
+  For each event defined in a resource, this transformer will generate a corresponding module
+  with the event name as a struct with the specified fields.
+  
+  This transformer should run after command modules have been generated.
+  
+  ## Example
+  
+  Given a resource with the following event:
+  
+  ```elixir
+  event :user_registered do
+    fields [:id, :email, :name]
   end
-
+  ```
+  
+  This transformer will generate a module like:
+  
+  ```elixir
+  defmodule MyApp.Events.UserRegistered do
+    @moduledoc "Event representing when a user was registered"
+    
+    @type t :: %__MODULE__{
+      id: String.t(),
+      email: String.t(),
+      name: String.t()
+    }
+    
+    defstruct [:id, :email, :name]
+  end
+  ```
+  """
+  
+  use Spark.Dsl.Transformer
+  alias Spark.Dsl.Transformer
+  alias AshCommanded.Commanded.Transformers.BaseTransformer
+  alias AshCommanded.Commanded.Transformers.GenerateCommandModules
+  
+  @doc """
+  Specifies that this transformer should run after the command module transformer.
+  """
   @impl true
+  def after?(GenerateCommandModules), do: true
   def after?(_), do: false
-
+  
+  @doc """
+  Transforms the DSL state to generate event modules.
+  
+  ## Examples
+  
+      iex> transform(dsl_state)
+      {:ok, updated_dsl_state}
+  """
   @impl true
-  def before?(_), do: false
-
-  @impl true
-  def after_compile?, do: false
-
-  defp validate_unique_event_modules!(resource, events) do
-    mods = Enum.map(events, &event_module(resource, &1))
-    dups = mods -- Enum.uniq(mods)
-
-    if dups != [] do
-      raise Spark.Error.DslError,
-        path: [:commanded, :events],
-        message: "Duplicate event module names detected: #{inspect(Enum.uniq(dups))}"
+  def transform(dsl_state) do
+    resource_module = Transformer.get_persisted(dsl_state, :module)
+    
+    with events when is_list(events) and events != [] <- 
+           Transformer.get_entities(dsl_state, [:commanded, :events]) do
+      
+      resource_name = BaseTransformer.get_resource_name(resource_module)
+      app_prefix = BaseTransformer.get_module_prefix(resource_module)
+      
+      final_state = Enum.reduce(events, dsl_state, fn event, acc_dsl_state ->
+        event_module = build_event_module(event, app_prefix)
+        BaseTransformer.create_module(event_module, build_event_module_ast(event, resource_name), __ENV__)
+        
+        # Store the generated module in DSL state for potential use by other transformers
+        event_modules = Transformer.get_persisted(acc_dsl_state, :event_modules, [])
+        updated_dsl_state = Transformer.persist(acc_dsl_state, :event_modules, [
+          {event.name, event_module} | event_modules
+        ])
+        
+        updated_dsl_state
+      end)
+      
+      {:ok, final_state}
+    else
+      _ -> {:ok, dsl_state}
     end
   end
-
-  defp generate_events(resource, events) do
-    Enum.each(events, fn event ->
-      mod = event_module(resource, event)
-      fields = event.fields
-
-      unless Code.ensure_loaded?(mod) do
-        {:module, ^mod, _, _} =
-          Module.create(
-            mod,
-            quote do
-              @moduledoc "Event module for #{unquote(event.name)}"
-              defstruct unquote(fields)
-
-              @type t :: %__MODULE__{
-                      unquote_splicing(for field <- fields, do: {field, quote(do: term())})
-                    }
-            end,
-            Macro.Env.location(__ENV__)
-          )
-      end
+  
+  @doc """
+  Builds the module name for an event.
+  
+  ## Examples
+  
+      iex> build_event_module(%Event{name: :user_registered}, MyApp)
+      MyApp.Events.UserRegistered
+      
+      iex> build_event_module(%Event{name: :user_registered, event_name: :new_user}, MyApp)
+      MyApp.Events.NewUser
+  """
+  def build_event_module(event, app_prefix) do
+    event_name = event.event_name || event.name
+    event_name_str = BaseTransformer.camelize_atom(event_name)
+    
+    Module.concat([app_prefix, "Events", event_name_str])
+  end
+  
+  @doc """
+  Builds the AST (Abstract Syntax Tree) for an event module.
+  
+  ## Examples
+  
+      iex> build_event_module_ast(%Event{name: :user_registered, fields: [:id]}, "User")
+      {:__block__, [], [{:@, [...], [{:moduledoc, [...], [...]}]}, ...]}
+  """
+  def build_event_module_ast(event, resource_name) do
+    fields = event.fields
+    event_name = event.event_name || event.name
+    
+    # Create a more descriptive moduledoc
+    event_description = humanize_event(event_name)
+    moduledoc = "Event representing when a #{resource_name} #{event_description}"
+    
+    quote do
+      @moduledoc unquote(moduledoc)
+      
+      @type t :: %__MODULE__{unquote_splicing(build_type_fields(fields))}
+      
+      defstruct unquote(fields)
+    end
+  end
+  
+  defp build_type_fields(fields) do
+    Enum.map(fields, fn field ->
+      {field, quote do: any()}
     end)
   end
-
-  defp event_module(resource, %{name: name} = event) do
-    ns =
-      case Module.get_attribute(resource, :event_namespace) do
-        nil ->
-          parts = Module.split(resource) |> Enum.drop(-1)
-          Module.concat(parts ++ ["Events"])
-
-        namespace ->
-          namespace
-      end
-
-    name_atom = event[:event_name] || Macro.camelize(to_string(name))
-    Module.concat(ns, name_atom)
+  
+  defp humanize_event(name) do
+    name
+    |> to_string()
+    |> String.replace("_", " ")
   end
 end

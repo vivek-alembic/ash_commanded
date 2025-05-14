@@ -1,21 +1,23 @@
 defmodule AshCommanded.Commanded.Projection do
   @moduledoc """
-  Struct for representing a projection update in response to an event.
+  Represents a projection in the Commanded DSL.
+  
+  Projections define how events affect the resource state, transforming events into resource updates.
   """
-
+  
+  @type t :: %__MODULE__{
+    name: atom(),
+    event_name: atom(),
+    action: atom(),
+    changes: map() | function(),
+    autogenerate?: boolean()
+  }
+  
   defstruct [
-    :event, 
-    :changes, 
-    :action, 
-    :projector_name, 
+    :name,
+    :event_name,
+    :action,
+    :changes,
     autogenerate?: true
   ]
-
-  @type t :: %__MODULE__{
-          event: atom,
-          changes: %{optional(atom) => any} | (any -> %{optional(atom) => any}),
-          action: atom | nil,
-          projector_name: atom | nil,
-          autogenerate?: boolean
-        }
 end

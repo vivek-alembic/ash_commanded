@@ -7,7 +7,7 @@ Projections in AshCommanded define how events affect the state of your resources
 Projections are defined in the `commanded` DSL extension for Ash resources:
 
 ```elixir
-defmodule MyApp.User do
+defmodule ECommerce.Customer do
   use Ash.Resource,
     extensions: [AshCommanded.Commanded.Dsl]
 
@@ -20,24 +20,24 @@ defmodule MyApp.User do
 
   commanded do
     events do
-      event :user_registered do
+      event :customer_registered do
         fields([:id, :email, :name])
       end
 
-      event :user_status_updated do
+      event :customer_status_updated do
         fields([:id, :status])
       end
     end
 
     projections do
-      projection :user_registered do
+      projection :customer_registered do
         action(:create)
         changes(%{
           status: "pending"
         })
       end
 
-      projection :user_status_updated do
+      projection :customer_status_updated do
         action(:update_by_id)
         changes(&Map.take(&1, [:status]))
       end
@@ -59,17 +59,17 @@ Each projection can have the following options:
 AshCommanded generates a projector module for each resource with projections. This projector is a Commanded event handler that subscribes to events and updates the read model.
 
 ```elixir
-defmodule MyApp.Projectors.UserProjector do
+defmodule ECommerce.Projectors.CustomerProjector do
   @moduledoc """
-  Projector for User-related events
+  Projector for Customer-related events
   """
 
   use Commanded.Projections.Ecto, 
-    name: "MyApp.Projectors.UserProjector"
+    name: "ECommerce.Projectors.CustomerProjector"
 
   # Each projection gets a project/3 function
-  project(%MyApp.Events.UserRegistered{} = event, _metadata, fn _context ->
-    Ash.Changeset.new(MyApp.User, event)
+  project(%ECommerce.Events.CustomerRegistered{} = event, _metadata, fn _context ->
+    Ash.Changeset.new(ECommerce.Customer, event)
     |> Ash.Changeset.for_action(:create, %{
       id: event.id,
       email: event.email, 
@@ -79,8 +79,8 @@ defmodule MyApp.Projectors.UserProjector do
     |> Ash.create()
   end)
   
-  project(%MyApp.Events.UserStatusUpdated{} = event, _metadata, fn _context ->
-    Ash.Changeset.new(MyApp.User, event)
+  project(%ECommerce.Events.CustomerStatusUpdated{} = event, _metadata, fn _context ->
+    Ash.Changeset.new(ECommerce.Customer, event)
     |> Ash.Changeset.for_action(:update_by_id, %{
       status: event.status
     })
@@ -99,7 +99,7 @@ end
 The generated projectors need to be registered with your Commanded application to start processing events. Add them to your application's supervisor tree:
 
 ```elixir
-defmodule MyApp.Application do
+defmodule ECommerce.Application do
   use Application
 
   def start(_type, _args) do
@@ -107,10 +107,10 @@ defmodule MyApp.Application do
       # ...other children
       
       # Start your projectors
-      MyApp.Projectors.UserProjector
+      ECommerce.Projectors.CustomerProjector
     ]
 
-    opts = [strategy: :one_for_one, name: MyApp.Supervisor]
+    opts = [strategy: :one_for_one, name: ECommerce.Supervisor]
     Supervisor.start_link(children, opts)
   end
 end
@@ -119,18 +119,18 @@ end
 For more complex projection needs, you can customize the `project/3` function directly in your own projector module:
 
 ```elixir
-defmodule MyApp.CustomProjector do
-  use Commanded.Projections.Ecto, name: "MyApp.CustomProjector"
+defmodule ECommerce.CustomProjector do
+  use Commanded.Projections.Ecto, name: "ECommerce.CustomProjector"
 
-  project(%MyApp.Events.UserRegistered{} = event, metadata, fn _context ->
+  project(%ECommerce.Events.CustomerRegistered{} = event, metadata, fn _context ->
     # Access event and metadata
-    user_id = event.id
+    customer_id = event.id
     timestamp = metadata.created_at
     
     # Custom projection logic
-    Ash.Changeset.new(MyApp.User)
+    Ash.Changeset.new(ECommerce.Customer)
     |> Ash.Changeset.for_action(:create, %{
-      id: user_id,
+      id: customer_id,
       email: event.email,
       name: event.name,
       status: "pending",
@@ -171,12 +171,12 @@ end
 For a resource with many projectors, you can also set the projector namespace:
 
 ```elixir
-defmodule MyApp.User do
+defmodule ECommerce.Customer do
   use Ash.Resource,
     extensions: [AshCommanded.Commanded.Dsl]
     
   # Set custom namespace for all projectors
-  @projector_namespace MyApp.CustomProjectors
+  @projector_namespace ECommerce.CustomProjectors
   
   # Resource definition...
 end

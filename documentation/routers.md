@@ -7,12 +7,15 @@ AshCommanded automatically generates [Commanded Routers](https://hexdocs.pm/comm
 For each Ash.Domain containing resources with the AshCommanded.Commanded.Dsl extension, a domain-specific router is generated:
 
 ```elixir
-defmodule MyApp.MyDomain.Router do
+defmodule ECommerce.Store.Router do
   use Commanded.Commands.Router
 
   # For each resource in the domain
-  identify MyApp.ResourceAggregate, by: :id
-  dispatch [MyApp.Commands.CreateResource, MyApp.Commands.UpdateResource], to: MyApp.ResourceAggregate
+  identify ECommerce.ProductAggregate, by: :id
+  dispatch [ECommerce.Commands.CreateProduct, ECommerce.Commands.UpdateProduct], to: ECommerce.ProductAggregate
+  
+  identify ECommerce.CustomerAggregate, by: :id
+  dispatch [ECommerce.Commands.RegisterCustomer, ECommerce.Commands.UpdateStatus], to: ECommerce.CustomerAggregate
 end
 ```
 
@@ -31,8 +34,11 @@ defmodule AshCommanded.Router do
   use Commanded.Commands.Router
 
   # Direct command routing for all resources
-  identify MyApp.ResourceAggregate, by: :id
-  dispatch [MyApp.Commands.CreateResource, MyApp.Commands.UpdateResource], to: MyApp.ResourceAggregate
+  identify ECommerce.ProductAggregate, by: :id
+  dispatch [ECommerce.Commands.CreateProduct, ECommerce.Commands.UpdateProduct], to: ECommerce.ProductAggregate
+  
+  identify ECommerce.CustomerAggregate, by: :id
+  dispatch [ECommerce.Commands.RegisterCustomer, ECommerce.Commands.UpdateStatus], to: ECommerce.CustomerAggregate
 end
 ```
 
@@ -45,8 +51,9 @@ defmodule AshCommanded.Router do
   use Commanded.Commands.Router
 
   # Forward to domain routers
-  forward MyApp.Domain1.Router
-  forward MyApp.Domain2.Router
+  forward ECommerce.Store.Router
+  forward ECommerce.Marketing.Router
+  forward ECommerce.Shipping.Router
 end
 ```
 
@@ -55,7 +62,7 @@ end
 With these routers in place, you can dispatch commands using:
 
 ```elixir
-command = %MyApp.Commands.CreateResource{id: "123", name: "Example"}
+command = %ECommerce.Commands.CreateProduct{id: "123", name: "Premium Widget", price: 29.99}
 AshCommanded.Router.dispatch(command)
 ```
 
@@ -68,8 +75,8 @@ By default, the router uses the resource's primary identity key or the specified
 ```elixir
 commanded do
   commands do
-    command :create_resource do
-      fields([:id, :name])
+    command :create_product do
+      fields([:id, :name, :price])
       identity_field(:id)  # Explicitly specify the identity field
     end
   end

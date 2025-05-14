@@ -1,27 +1,62 @@
 defmodule AshCommanded.Commanded.Verifiers.ValidateProjectionActions do
   @moduledoc """
-  Ensures that each projection references a valid action on the resource.
+  Verifies that projections specify valid Ash actions.
+  
+  This ensures that each projection specifies an action that is appropriate for
+  resource operations, such as :create, :update, or :destroy.
   """
-
-  @behaviour Spark.Dsl.Verifier
-
+  
+  use Spark.Dsl.Verifier
+  
+  alias Spark.Dsl.Verifier
   alias Spark.Error.DslError
-  alias Ash.Resource.Info, as: ResourceInfo
-  alias AshCommanded.Commanded.Info
-
+  
+  # List of common valid Ash actions
+  @valid_actions [:create, :update, :destroy, :read]
+  
   @impl true
-  def verify(resource) do
-    defined_actions = ResourceInfo.actions(resource) |> Enum.map(& &1.name) |> MapSet.new()
-
-    Enum.each(Info.projections(resource), fn proj ->
-      if proj[:action] && not MapSet.member?(defined_actions, proj[:action]) do
-        raise DslError,
-          path: [:commanded, :projections, proj.name],
-          message:
-            "Projection #{inspect(proj.name)} references missing action: #{inspect(proj[:action])}"
-      end
+  def verify(dsl_state) do
+    resource_module = Verifier.get_persisted(dsl_state, :module)
+    projections = Verifier.get_entities(dsl_state, [:commanded, :projections])
+    
+    # Find projections with potentially invalid actions
+    invalid_projections = Enum.filter(projections, fn projection ->
+      projection.action not in @valid_actions
     end)
-
-    :ok
+    
+    case invalid_projections do
+      [] ->
+        :ok
+      
+      invalid ->
+        message = build_error_message(resource_module, invalid)
+        {:error, DslError.exception(message: message, path: [:commanded, :projections])}
+    end
+  end
+  
+  defp build_error_message(resource_module, invalid_projections) do
+    projections_list =
+      invalid_projections
+      |> Enum.map(fn projection ->
+        "  - Projection `#{projection.name}` specifies potentially invalid action `#{projection.action}`"
+      end)
+      |> Enum.join("\n")
+    
+    valid_actions_list = 
+      @valid_actions
+      |> Enum.map(&"  - #{inspect(&1)}")
+      |> Enum.join("\n")
+    
+    """
+    Some projections in #{inspect(resource_module)} specify actions that might not be valid:
+    
+    #{projections_list}
+    
+    Common valid Ash actions include:
+    
+    #{valid_actions_list}
+    
+    If you're using a custom action name, ensure that it corresponds to a valid action defined in your resource.
+    """
   end
 end

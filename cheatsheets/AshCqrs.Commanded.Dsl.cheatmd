@@ -1,29 +1,143 @@
 # AshCommanded.Commanded.Dsl Cheatsheet
 
-This is a placeholder cheatsheet that will be replaced by the auto-generated version when you run `mix spark.cheat_sheets`.
+This is a cheatsheet for the AshCommanded.Commanded.Dsl extension. This extension allows you to define CQRS and Event Sourcing patterns directly in your Ash resources.
 
 ## Commands
 
 ```elixir
-command :create_user do
-  fields([:id, :name, :email])
-  identity_field(:id)
+defmodule ECommerce.Customer do
+  use Ash.Resource,
+    extensions: [AshCommanded.Commanded.Dsl]
+
+  commanded do
+    commands do
+      # Basic command with required fields
+      command :register_customer do
+        fields [:id, :email, :name]
+        identity_field :id
+      end
+      
+      # Command with custom name
+      command :update_email do
+        fields [:id, :email]
+        command_name UpdateCustomerEmail
+      end
+
+      # Command that maps to a specific action
+      command :deactivate do
+        fields [:id]
+        action :mark_inactive
+      end
+
+      # Command with handler options
+      command :change_password do
+        fields [:id, :old_password, :new_password]
+        handler_name :handle_password_change
+        autogenerate_handler? false
+      end
+    end
+  end
 end
 ```
 
 ## Events
 
 ```elixir
-event :user_created do
-  fields([:id, :name, :email])
+defmodule ECommerce.Customer do
+  use Ash.Resource,
+    extensions: [AshCommanded.Commanded.Dsl]
+
+  commanded do
+    events do
+      # Basic event
+      event :customer_registered do
+        fields [:id, :email, :name]
+      end
+      
+      # Event with custom name
+      event :email_changed do
+        fields [:id, :email]
+        event_name CustomerEmailUpdated
+      end
+    end
+  end
 end
 ```
 
 ## Projections
 
 ```elixir
-projection :user_created do
-  action(:create)
-  changes(%{status: "active"})
+defmodule ECommerce.Customer do
+  use Ash.Resource,
+    extensions: [AshCommanded.Commanded.Dsl]
+
+  commanded do
+    projections do
+      # Map an event to resource changes
+      projection :customer_registered do
+        action :create
+        changes(%{
+          status: "active",
+          registered_at: &DateTime.utc_now/0
+        })
+      end
+      
+      # Using a function to compute changes
+      projection :email_changed do
+        action :update_by_id
+        changes(fn event ->
+          %{
+            email: event.email,
+            updated_at: DateTime.utc_now()
+          }
+        end)
+      end
+
+      # Optional settings
+      projection :customer_deactivated do
+        action :update
+        changes(%{status: "inactive"})
+        projector_name ECommerce.CustomProjector
+        autogenerate? false
+      end
+    end
+  end
+end
+```
+
+## Application Configuration
+
+```elixir
+defmodule ECommerce.Store do
+  use Ash.Domain,
+    extensions: [AshCommanded.Commanded.Dsl]
+
+  resources do
+    resource ECommerce.Product
+    resource ECommerce.Customer
+    resource ECommerce.Order
+  end
+
+  commanded do
+    application do
+      # Required options
+      otp_app :ecommerce
+      event_store Commanded.EventStore.Adapters.EventStore
+
+      # Optional settings
+      pubsub :phoenix
+      registry :local
+      include_supervisor? true
+      
+      # Optional application prefix
+      prefix "ECommerce.CQRS"
+      
+      # Aggregate snapshotting options
+      snapshotting [
+        snapshot_every: 100,
+        snapshot_version: "1"
+      ]
+    end
+  end
 end
 ```

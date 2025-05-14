@@ -1,106 +1,122 @@
 defmodule AshCommanded.Commanded.Transformers.GenerateCommandModules do
   @moduledoc """
-  Generates Elixir modules for each defined command in the DSL.
-
-  Each command becomes a module with a `defstruct` and typespec under:
-  `YourApp.YourResource.Commands.<CommandName>`
-
-  ## Example Generated Module
-
-      defmodule MyApp.Accounts.Commands.RegisterUser do
-        @moduledoc "Command module for :register_user"
-        @enforce_keys [:id, :email, :name]
-        defstruct id: nil, email: nil, name: nil
-
-        @type t :: %__MODULE__{
-                id: term(),
-                email: term(),
-                name: term()
-              }
-      end
-
-  You can customize the base namespace by setting the `@command_namespace` module attribute
-  on the resource module, or override per-command using:
-
-  - `command_name: :CustomName` to control the generated module name
-  - `autogenerate?: false` to skip code generation for that command
-  """
-
-  @behaviour Spark.Dsl.Transformer
-
-  alias AshCommanded.Commanded.Info
-
-  @impl true
-  def transform(resource) do
-    commands =
-      Info.commands(resource)
-      |> Enum.reject(&(&1[:autogenerate?] == false))
-
-    validate_unique_command_modules!(resource, commands)
-
-    Enum.each(commands, fn command ->
-      mod = command_module(resource, command)
-      fields = command.fields
-
-      struct_fields = for field <- fields, do: {field, nil}
-      typespec_fields = for field <- fields, do: {field, quote(do: term())}
-
-      unless Code.ensure_loaded?(mod) do
-        {:module, ^mod, _, _} =
-          Module.create(
-            mod,
-            quote do
-              @moduledoc "Command module for #{unquote(command.name)}"
-
-              @enforce_keys unquote(fields)
-              defstruct unquote(struct_fields)
-
-              @type t :: %__MODULE__{
-                      unquote_splicing(typespec_fields)
-                    }
-            end,
-            Macro.Env.location(__ENV__)
-          )
-      end
-    end)
-
-    {:ok, resource}
+  Generates command modules based on the commands defined in the DSL.
+  
+  For each command defined in a resource, this transformer will generate a corresponding module
+  with the command name as a struct with the specified fields.
+  
+  This transformer should run before any other code generation transformers.
+  
+  ## Example
+  
+  Given a resource with the following command:
+  
+  ```elixir
+  command :register_user do
+    fields [:id, :email, :name]
+    identity_field :id
   end
-
+  ```
+  
+  This transformer will generate a module like:
+  
+  ```elixir
+  defmodule MyApp.Commands.RegisterUser do
+    @moduledoc "Command for registering a user"
+    
+    @type t :: %__MODULE__{
+      id: String.t(),
+      email: String.t(),
+      name: String.t()
+    }
+    
+    defstruct [:id, :email, :name]
+  end
+  ```
+  """
+  
+  use Spark.Dsl.Transformer
+  alias Spark.Dsl.Transformer
+  alias AshCommanded.Commanded.Transformers.BaseTransformer
+  alias AshCommanded.Commanded.Transformers.GenerateEventModules
+  
+  @doc """
+  Specifies that this transformer should run before the event module transformer.
+  """
   @impl true
-  def after?(_), do: false
-
-  @impl true
+  def before?(GenerateEventModules), do: true
   def before?(_), do: false
-
+  
+  @doc """
+  Transforms the DSL state to generate command modules.
+  
+  ## Examples
+  
+      iex> transform(dsl_state)
+      updated_dsl_state
+  """
   @impl true
-  def after_compile?, do: false
-
-  defp validate_unique_command_modules!(resource, commands) do
-    mods =
-      commands
-      |> Enum.map(&command_module(resource, &1))
-
-    dups = mods -- Enum.uniq(mods)
-
-    if dups != [] do
-      raise Spark.Error.DslError,
-        path: [:commanded, :commands],
-        message: "Duplicate command module names detected: #{inspect(Enum.uniq(dups))}"
+  def transform(dsl_state) do
+    resource_module = Transformer.get_persisted(dsl_state, :module)
+    
+    with commands when is_list(commands) and commands != [] <- 
+           Transformer.get_entities(dsl_state, [:commanded, :commands]) do
+      
+      resource_name = BaseTransformer.get_resource_name(resource_module)
+      app_prefix = BaseTransformer.get_module_prefix(resource_module)
+      
+      final_state = Enum.reduce(commands, dsl_state, fn command, acc_dsl_state ->
+        command_module = build_command_module(command, app_prefix)
+        BaseTransformer.create_module(command_module, build_command_module_ast(command, resource_name), __ENV__)
+        
+        # Store the generated module in DSL state for potential use by other transformers
+        command_modules = Transformer.get_persisted(acc_dsl_state, :command_modules, [])
+        updated_dsl_state = Transformer.persist(acc_dsl_state, :command_modules, [
+          {command.name, command_module} | command_modules
+        ])
+        
+        updated_dsl_state
+      end)
+      
+      {:ok, final_state}
+    else
+      _ -> {:ok, dsl_state}
     end
   end
-
-  defp command_module(resource, %{name: name} = command) do
-    custom_ns = Module.get_attribute(resource, :command_namespace)
-
-    base_parts =
-      if custom_ns do
-        Module.split(custom_ns)
-      else
-        Module.split(resource) |> Enum.drop(-1) |> then(&(&1 ++ ["Commands"]))
-      end
-
-    name_atom = command[:command_name] || Macro.camelize(to_string(name))
-    Module.concat(base_parts ++ [name_atom])
+  
+  defp build_command_module(command, app_prefix) do
+    command_name = command.command_name || command.name
+    command_name_str = BaseTransformer.camelize_atom(command_name)
+    
+    Module.concat([app_prefix, "Commands", command_name_str])
+  end
+  
+  defp build_command_module_ast(command, resource_name) do
+    fields = command.fields
+    command_name = command.command_name || command.name
+    
+    # Create a more descriptive moduledoc
+    verb = humanize_verb(command_name)
+    moduledoc = "Command for #{verb} a #{resource_name}"
+    
+    quote do
+      @moduledoc unquote(moduledoc)
+      
+      @type t :: %__MODULE__{unquote_splicing(build_type_fields(fields))}
+      
+      defstruct unquote(fields)
+    end
+  end
+  
+  defp build_type_fields(fields) do
+    Enum.map(fields, fn field ->
+      {field, quote do: any()}
+    end)
+  end
+  
+  defp humanize_verb(name) do
+    name
+    |> to_string()
+    |> String.replace("_", " ")
   end
 end

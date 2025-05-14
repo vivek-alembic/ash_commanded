@@ -2,6 +2,43 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Goal
+You are an Elixir software engineer and undertand the [Elixir language](https://elixir-lang.org/).
+You have read the [Elixir School](https://elixirschool.com/en/) articles in the suggested order.
+You are aware of the the [Elixir code smells](https://github.com/lucasvegi/Elixir-Code-Smells) and should avoid them when generating code.
+When creating Elixir modules make sure to document them (@moduledoc).
+When creating Elixir functions make sure to document them (@doc) and provide an example.
+When creating Elixir functions make sure to create typespec (@typespec) definitions.
+
+You must consider the Command Query Responsability (CQRS) pattern.
+You must consider the Event Sourcing (ES) pattern.
+You will be using version 1.4.8 of the [Commanded library](https://hexdocs.pm/commanded/1.4.8/Commanded.html).
+
+You will be writing code for the [Ash 3.5.9 framework](https://hexdocs.pm/ash/3.5.9/readme.html).
+You are an Elixir software engineer and undertand the Elixir language (https://elixir-lang.org/).
+You have read the Elixir School (https://elixirschool.com/en/) articles in the suggested order.
+You are aware of the the Elixir code smells (https://github.com/lucasvegi/Elixir-Code-Smells) and should avoid them when generating code.
+When creating Elixir modules make sure to document them (@moduledoc).
+When creating Elixir functions make sure to document them (@doc) and provide an example.
+When creating Elixir functions make sure to create typespec (@typespec) definitions.
+
+You must consider the Command Query Responsability (CQRS) pattern.
+You must consider the Event Sourcing (ES) pattern.
+You will be using version 1.4.8 of the Commanded library (https://hexdocs.pm/commanded/1.4.8/Commanded.html).
+
+You will be writing code for the Ash 3.5.9 framework (https://hexdocs.pm/ash/3.5.9/readme.html).
+You will be using the Spark 2.2.54 library (https://hexdocs.pm/spark/2.2.54/get-started-with-spark.html)
+You understand how to write well organized DSL with the Spark (https://hexdocs.pm/spark/get-started-with-spark.html).
+
+
+Your goal is to create an Ash framework extension using the Spark DSL library that will allow for declaratively using Commanded as an Extension inside the ash framewor.
+
+You will be using the [Spark 2.2.54 library](https://hexdocs.pm/spark/2.2.54/get-started-with-spark.html)
+
+
+Your goal is to create an Ash framework extension using the Spark DSL library that will allow for declaratively using Commanded as an Extension inside the ash framewor.
+
+
 ## Overview
 
 AshCommanded is an Elixir library that provides Command Query Responsibility Segregation (CQRS) and Event-Sourcing (ES) patterns for the Ash Framework. It extends Ash resources with a Commanded DSL that enables defining commands, events, and projections.
@@ -48,19 +85,27 @@ AshCommanded is built as a DSL extension for Ash Framework resources. Its main c
    - Commanded application modules (with projector supervision)
 
 3. **Transformers**: The DSL uses transformers to generate code:
-   - `GenerateCommandModules`: Generates command structs
-   - `GenerateEventModules`: Generates event structs
-   - `GenerateProjectionModules`: Generates projection modules
-   - `GenerateProjectorModules`: Generates Commanded event handlers that process events
-   - `GenerateAggregateModule`: Generates aggregate module for Commanded
-   - `GenerateDomainRouterModule`: Generates router module for each domain
-   - `GenerateMainRouterModule`: Generates main application router
-   - `GenerateCommandedApplication`: Generates Commanded application with projector supervision
+   - `GenerateCommandModules`: Generates command structs.
+   - `GenerateEventModules`: Generates event structs.
+   - `GenerateProjectionModules`: Generates projection modules.
+   - `GenerateProjectorModules`: Generates Commanded event handlers that process events.
+   - `GenerateAggregateModule`: Generates aggregate module for Commanded.
+   - `GenerateDomainRouterModule`: Generates router module for each domain.
+   - `GenerateMainRouterModule`: Generates main application router.
+   - `GenerateCommandedApplication`: Generates Commanded application with projector supervision.
 
 4. **Verifiers**: Validate DSL usage:
-   - Command validation (names, fields, handlers, etc.)
-   - Event validation (names, fields, etc.)
-   - Projection validation (events, actions, changes, etc.)
+   - `ValidateCommandActions`: ensures that each command refers to a valid action in the resource.
+   - `ValidateCommandFields`:  Ensures that all fields declared in a command exist as attributes in the resource.
+   - `ValidateCommandHandlers`: Ensures no two commands use the same handler function name within a resource.
+   - `ValidateCommandNames`:  Ensures that each command name within a resource is unique.
+   - `ValidateCommandNameConflict`: Ensures that command names do not shadow unrelated resource actions.
+   - `ValidateEventFields`: Ensures that every field listed in each event exists as an attribute in the resource.
+   - `ValidateEventNames`: Ensures that all event names are unique within a resource.
+   - `ValidateProjectionActions`: Ensures that each projection references a valid action on the resource.
+   - `ValidateProjectionChanges`: Ensures that each projection only updates known attributes.
+   - `ValidateProjectionEvents`: Ensures that any projections refer to a valid event defined in the same resource.
+
 
 ## Usage Example
 

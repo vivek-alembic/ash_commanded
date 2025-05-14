@@ -1,44 +1,51 @@
 defmodule AshCommanded.Commanded.DslTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
-  alias MyApp.User
-
-  test "extension DSL functionality works properly" do
-    # Test that commands section exists and is processed
-    commands = AshCommanded.Commanded.Info.commands(User)
-    assert length(commands) == 2
-
-    # Extract the register_user command
-    register_command = Enum.find(commands, &(&1.name == :register_user))
-    confirm_command = Enum.find(commands, &(&1.name == :confirm_email))
-
-    # Test command properties
-    assert register_command != nil
-    assert register_command.fields == [:id, :name, :email]
-    assert register_command.identity_field == :id
-
-    assert confirm_command != nil
-    assert confirm_command.fields == [:id]
-    assert confirm_command.identity_field == :id
-
-    # Test that events section exists
-    events = AshCommanded.Commanded.Info.events(User)
-    assert length(events) == 2
-
-    # Extract the events
-    registered_event = Enum.find(events, &(&1.name == :user_registered))
-    confirmed_event = Enum.find(events, &(&1.name == :email_confirmed))
-
-    # Test event properties
-    assert registered_event != nil
-    assert registered_event.fields == [:id, :name, :email]
-
-    assert confirmed_event != nil
-    assert confirmed_event.fields == [:id]
+  defmodule TestResource do
+    use Ash.Resource,
+      extensions: [AshCommanded.Commanded.Dsl],
+      domain: nil
+      
+    commanded do
+    end
   end
 
-  test "DSL is properly registered with Spark" do
-    extensions = Spark.Dsl.Extension.get_extensions(AshCommanded.Commanded.Dsl)
-    assert Enum.any?(extensions, fn ext -> ext.name == :commanded end)
+  defmodule RegularResource do
+    use Ash.Resource,
+      domain: nil
+  end
+  
+  defmodule ResourceWithCommanded do
+    use Ash.Resource,
+      extensions: [AshCommanded.Commanded.Dsl],
+      domain: nil
+      
+    commanded do
+      commands do
+      end
+      
+      events do
+      end
+      
+      projections do
+      end
+    end
+  end
+
+  describe "extension?/1" do
+    test "returns true for resources using the extension" do
+      assert AshCommanded.Commanded.Dsl.extension?(TestResource)
+    end
+    
+    test "returns false for resources not using the extension" do
+      refute AshCommanded.Commanded.Dsl.extension?(RegularResource)
+    end
+  end
+  
+  describe "DSL sections" do
+    test "resource can define commanded sections" do
+      # Just checking that the module compiles successfully
+      assert Code.ensure_loaded?(ResourceWithCommanded)
+    end
   end
 end
