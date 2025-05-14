@@ -86,7 +86,10 @@ defmodule AshCommanded.Commanded.Dsl do
       AshCommanded.Commanded.Transformers.GenerateCommandModules,
       AshCommanded.Commanded.Transformers.GenerateEventModules,
       AshCommanded.Commanded.Transformers.GenerateProjectionModules,
-      AshCommanded.Commanded.Transformers.GenerateProjectorModules
+      AshCommanded.Commanded.Transformers.GenerateProjectorModules,
+      AshCommanded.Commanded.Transformers.GenerateAggregateModule,
+      AshCommanded.Commanded.Transformers.GenerateDomainRouterModule,
+      AshCommanded.Commanded.Transformers.GenerateMainRouterModule
     ],
     verifiers: [
       AshCommanded.Commanded.Verifiers.ValidateCommandFields,
