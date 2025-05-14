@@ -11,7 +11,7 @@ defmodule AshCommanded.MixProject do
       version: @version,
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
-      consolidate_protocols: Mix.env() != :dev,
+      consolidate_protocols: Mix.env() == :prod,
       deps: deps(),
       
       # Hex

@@ -34,7 +34,6 @@ defmodule AshCommanded.Commanded.CommandsDslTest do
       end
     end
   end
-      
   
   describe "commands DSL" do
     test "resource can define commands" do

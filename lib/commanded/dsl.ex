@@ -48,11 +48,13 @@ defmodule AshCommanded.Commanded.Dsl do
     imports: []
   }
   
+  alias AshCommanded.Commanded.Sections.EventsSection
+  
   @events_section %Spark.Dsl.Section{
     name: :events,
     describe: "Define events that are emitted by commands",
-    schema: [],
-    entities: [],
+    schema: EventsSection.schema(),
+    entities: EventsSection.entities(),
     imports: []
   }
   
