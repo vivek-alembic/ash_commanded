@@ -15,6 +15,20 @@ defmodule AshCommanded.Commanded.ProjectionsDslTest do
     end
     
     commanded do
+      events do
+        event :user_registered do
+          fields [:id, :email, :name]
+        end
+        
+        event :email_changed do
+          fields [:id, :email]
+        end
+        
+        event :user_deactivated do
+          fields [:id]
+        end
+      end
+      
       projections do
         projection :user_registered do
           event_name :user_registered

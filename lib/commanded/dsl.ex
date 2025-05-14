@@ -91,7 +91,10 @@ defmodule AshCommanded.Commanded.Dsl do
       AshCommanded.Commanded.Verifiers.ValidateCommandFields,
       AshCommanded.Commanded.Verifiers.ValidateCommandNames,
       AshCommanded.Commanded.Verifiers.ValidateEventFields,
-      AshCommanded.Commanded.Verifiers.ValidateEventNames
+      AshCommanded.Commanded.Verifiers.ValidateEventNames,
+      AshCommanded.Commanded.Verifiers.ValidateProjectionEvents,
+      AshCommanded.Commanded.Verifiers.ValidateProjectionActions,
+      AshCommanded.Commanded.Verifiers.ValidateProjectionChanges
     ]
 
   @doc """
