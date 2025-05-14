@@ -58,11 +58,13 @@ defmodule AshCommanded.Commanded.Dsl do
     imports: []
   }
   
+  alias AshCommanded.Commanded.Sections.ProjectionsSection
+  
   @projections_section %Spark.Dsl.Section{
     name: :projections,
     describe: "Define how events affect the resource state",
-    schema: [],
-    entities: [],
+    schema: ProjectionsSection.schema(),
+    entities: ProjectionsSection.entities(),
     imports: []
   }
   
