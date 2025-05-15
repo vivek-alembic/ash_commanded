@@ -72,8 +72,15 @@ defmodule AshCommanded.MixProject do
         "documentation/commands.md",
         "documentation/events.md",
         "documentation/projections.md",
+        "documentation/event_handlers.md",
+        "documentation/middleware.md",
+        "documentation/parameter_handling.md",
+        "documentation/transactions.md",
+        "documentation/context_propagation.md",
+        "documentation/error_handling.md",
         "documentation/routers.md",
         "documentation/application.md",
+        "documentation/snapshotting.md",
         "cheatsheets/AshCommanded.Commanded.Dsl.cheatmd"
       ],
       groups_for_extras: [
@@ -81,8 +88,17 @@ defmodule AshCommanded.MixProject do
           "documentation/commands.md",
           "documentation/events.md",
           "documentation/projections.md",
+          "documentation/event_handlers.md",
           "documentation/routers.md",
-          "documentation/application.md"
+          "documentation/application.md",
+          "documentation/snapshotting.md"
+        ],
+        "Advanced Features": [
+          "documentation/middleware.md",
+          "documentation/parameter_handling.md",
+          "documentation/transactions.md",
+          "documentation/context_propagation.md",
+          "documentation/error_handling.md"
         ],
         "Cheatsheets": [
           "cheatsheets/AshCommanded.Commanded.Dsl.cheatmd"

@@ -1,0 +1,181 @@
+# AshCommanded DSL Cheatsheet
+
+## Resource Configuration
+
+```elixir
+defmodule MyApp.User do
+  use Ash.Resource,
+    extensions: [AshCommanded.Commanded.Dsl]
+    
+  # Resource configuration...
+    
+  commanded do
+    # Commanded DSL configuration...
+  end
+end
+```
+
+## Command Definition
+
+```elixir
+commanded do
+  commands do
+    command :register_user do
+      fields [:id, :name, :email]
+      identity_field :id
+      action :register
+      
+      # Optional settings
+      command_name :RegisterUser
+      autogenerate_handler? true
+      handler_name :handle_register
+      in_transaction? true
+      repo MyApp.Repo
+      
+      # Advanced options
+      middleware [MyApp.LoggingMiddleware]
+      
+      # Parameter transformations
+      transform_params do
+        map email: :normalized_email
+        compute :timestamp, &DateTime.utc_now/0
+      end
+      
+      # Parameter validations
+      validate_params do
+        validate :email, format: ~r/@/
+        validate :name, present: true
+      end
+      
+      # Alternative transaction syntax
+      transaction do
+        enabled? true
+        repo MyApp.Repo
+        timeout 5000
+        isolation_level :read_committed
+      end
+      
+      # Context options
+      include_aggregate? true
+      include_command? true
+      include_metadata? true
+      context_prefix :cmd
+    end
+  end
+end
+```
+
+## Event Definition
+
+```elixir
+commanded do
+  events do
+    event :user_registered do
+      fields [:id, :name, :email]
+      
+      # Optional settings
+      event_name :UserRegistered
+    end
+  end
+end
+```
+
+## Projection Definition
+
+```elixir
+commanded do
+  projections do
+    projection :user_registered do
+      # Define the Ash action to invoke
+      action :create
+      
+      # Static changes
+      changes(%{
+        status: "active"
+      })
+      
+      # Or dynamic changes via function
+      changes(fn event ->
+        %{
+          id: event.id,
+          name: event.name,
+          email: event.email,
+          registered_at: DateTime.utc_now()
+        }
+      end)
+      
+      # Optional settings
+      autogenerate? true
+      projector_name :CustomUserProjector
+    end
+  end
+end
+```
+
+## Event Handler Definition
+
+```elixir
+commanded do
+  event_handlers do
+    # Function-based handler
+    handler :notification_handler do
+      events [:user_registered]
+      action fn event, _metadata ->
+        MyApp.Notifications.send_welcome_email(event.email)
+        :ok
+      end
+    end
+    
+    # Ash action handler
+    handler :external_sync do
+      events [:user_registered]
+      action :sync_to_crm
+      idempotent true
+    end
+    
+    # PubSub publishing handler
+    handler :event_broadcaster do
+      events [:user_registered, :email_changed]
+      publish_to "user_events"
+    end
+    
+    # Optional settings
+    handler :custom_name_handler do
+      events [:user_registered]
+      action fn _, _ -> :ok end
+      handler_name :CustomHandler
+      autogenerate? true
+    end
+  end
+end
+```
+
+## Application Configuration
+
+```elixir
+defmodule MyApp.Domain do
+  use Ash.Domain, extensions: [AshCommanded.Commanded.Dsl]
+  
+  resources do
+    resource MyApp.User
+  end
+  
+  commanded do
+    application do
+      otp_app :my_app
+      event_store Commanded.EventStore.Adapters.EventStore
+      
+      # Optional settings
+      pubsub :local
+      registry :local
+      include_supervisor? true
+      
+      # Snapshotting
+      snapshotting true
+      snapshot_threshold 100
+      snapshot_version 1
+      snapshot_store MyApp.CustomSnapshotStore
+    end
+  end
+end
+```

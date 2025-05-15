@@ -91,11 +91,11 @@ end
 
 ### Projections
 
-Projections transform events into resource updates, allowing you to maintain read models. This aligns with the Commanded concept of [read model projections](https://hexdocs.pm/commanded/read-model-projections.html). See the [Projections](projections.md) documentation for details.
+Projections transform events into resource updates, allowing you to maintain read models. This aligns with the Commanded concept of [read model projections](https://hexdocs.pm/commanded/read-model-projections.html). See the [Projections](projections.html) documentation for details.
 
 ### Event Handlers
 
-Event handlers allow you to respond to events with side effects like sending notifications or integrating with external systems. These are implemented as [Commanded event handlers](https://hexdocs.pm/commanded/Commanded.Event.Handler.html). See the [Event Handlers](event_handlers.md) documentation for more information.
+Event handlers allow you to respond to events with side effects like sending notifications or integrating with external systems. These are implemented as [Commanded event handlers](https://hexdocs.pm/commanded/Commanded.Event.Handler.html). See the [Event Handlers](event_handlers.html) documentation for more information.
 
 ## Choosing Between Projections and Event Handlers
 

@@ -64,7 +64,7 @@ Each command can have the following options:
 - `transaction_timeout`: The transaction timeout in milliseconds (number)
 - `transaction_isolation_level`: The transaction isolation level (atom)
 
-For detailed information about transaction support, see the [Transactions](transactions.md) documentation.
+For detailed information about transaction support, see the [Transactions](transactions.html) documentation.
 
 ## Generated Command Modules
 
