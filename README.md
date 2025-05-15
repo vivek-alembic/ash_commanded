@@ -59,7 +59,15 @@ AshCommanded is built as a DSL extension for Ash Framework resources. Its main c
    - `GenerateMainRouterModule`: Generates main application router
    - `GenerateCommandedApplication`: Generates Commanded application with projector and handler supervision
 
-4. **Verifiers**: Validate DSL usage:
+4. **Advanced Features**:
+   - **Command Middleware**: Process commands through a pipeline of middleware functions
+   - **Parameter Transformation**: Transform command parameters before action execution
+   - **Parameter Validation**: Validate command parameters before action execution
+   - **Transactional Commands**: Execute commands within database transactions
+   - **Context Propagation**: Pass command, aggregate, and metadata context to actions
+   - **Error Standardization**: Normalized error handling across the extension
+
+5. **Verifiers**: Validate DSL usage:
    - Command validation (names, fields, handlers, etc.)
    - Event validation (names, fields, etc.)
    - Projection validation (events, actions, changes, etc.)
@@ -184,8 +192,16 @@ mix gen.docs
 
 The documentation includes:
 - Guides for commands, events, projections, event handlers, and routers
+- Guides for middleware, parameter handling, transactions, and context propagation
 - API reference for all modules
 - Cheatsheets for the DSL
+
+Additional documentation files:
+- [Middleware](documentation/middleware.md)
+- [Parameter Handling](documentation/parameter_handling.md)
+- [Transactions](documentation/transactions.md)
+- [Context Propagation](documentation/context_propagation.md)
+- [Error Handling](documentation/error_handling.md)
 
 ## Commands
 
@@ -255,6 +271,92 @@ Handler options:
 - `handler_name` - Custom function name for the handler clause
 - `action` - Specify a different Ash action to call (defaults to command name)
 - `autogenerate_handler?` - Set to false to disable handler generation
+
+## Middleware, Parameter Handling, and Transactions
+
+AshCommanded provides advanced features for command processing:
+
+### Middleware
+
+Command middleware allows you to intercept and modify commands before they are executed:
+
+```elixir
+commanded do
+  commands do
+    # Apply middleware to all commands in this resource
+    middleware AuditLogger
+    middleware {Authorization, roles: [:admin]}
+    
+    command :register_customer do
+      fields([:id, :name, :email])
+      # Command-specific middleware
+      middleware {RateLimiter, limit: 10}
+    end
+  end
+end
+```
+
+### Parameter Transformation and Validation
+
+You can transform and validate command parameters before action execution:
+
+```elixir
+command :create_order do
+  fields([:id, :items, :customer_id, :total])
+  
+  transform_params do
+    map item_ids: :items
+    compute :timestamp, &DateTime.utc_now/0
+    cast :total, :decimal
+  end
+  
+  validate_params do
+    validate :total, number: [greater_than: 0]
+    validate :items, present: true
+  end
+end
+```
+
+### Transaction Support
+
+Execute commands within database transactions:
+
+```elixir
+command :place_order do
+  fields [:id, :customer_id, :items]
+  
+  # Use inline transaction options
+  in_transaction? true
+  repo MyApp.Repo
+  transaction_timeout 5000
+  transaction_isolation_level :serializable
+  
+  # Or use block syntax
+  transaction do
+    enabled? true
+    repo MyApp.Repo
+    timeout 5000
+    isolation_level :read_committed
+  end
+end
+```
+
+### Context Propagation
+
+Control how command context is passed to actions:
+
+```elixir
+command :register_customer do
+  fields [:id, :name, :email]
+  
+  # Context options
+  include_aggregate? true
+  include_command? true
+  include_metadata? true
+  context_prefix :cmd
+  static_context %{source: :registration_api}
+end
+```
 
 ## Events
 

@@ -195,6 +195,30 @@ defmodule AshCommanded.Commanded.Sections.CommandsSection do
       transaction_isolation_level: [
         type: {:in, [:read_committed, :repeatable_read, :serializable]},
         doc: "Transaction isolation level"
+      ],
+      # Context propagation options
+      include_metadata?: [
+        type: :boolean,
+        default: true,
+        doc: "Whether to include command metadata in the action context"
+      ],
+      include_aggregate?: [
+        type: :boolean,
+        default: true,
+        doc: "Whether to include the aggregate state in the action context"
+      ],
+      include_command?: [
+        type: :boolean,
+        default: true,
+        doc: "Whether to include the command itself in the action context"
+      ],
+      context_prefix: [
+        type: :atom,
+        doc: "An optional prefix for context keys to prevent collisions"
+      ],
+      static_context: [
+        type: :map,
+        doc: "Static context values to include in every action execution"
       ]
     ],
     imports: [@transform_params_entity, @validate_params_entity, @transaction_entity]

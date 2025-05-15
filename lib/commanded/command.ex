@@ -22,7 +22,13 @@ defmodule AshCommanded.Commanded.Command do
     in_transaction?: boolean(),
     repo: atom() | nil,
     transaction_timeout: integer() | nil,
-    transaction_isolation_level: :read_committed | :repeatable_read | :serializable | nil
+    transaction_isolation_level: :read_committed | :repeatable_read | :serializable | nil,
+    # Context propagation options
+    include_metadata?: boolean(),
+    include_aggregate?: boolean(),
+    include_command?: boolean(),
+    context_prefix: atom() | nil,
+    static_context: map() | nil
   }
   
   defstruct [
@@ -42,6 +48,12 @@ defmodule AshCommanded.Commanded.Command do
     in_transaction?: false,
     repo: nil,
     transaction_timeout: nil,
-    transaction_isolation_level: nil
+    transaction_isolation_level: nil,
+    # Context propagation options
+    include_metadata?: true,
+    include_aggregate?: true,
+    include_command?: true,
+    context_prefix: nil,
+    static_context: %{}
   ]
 end
