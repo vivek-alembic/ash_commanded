@@ -11,6 +11,8 @@ defmodule AshCommanded.Commanded.Verifiers.IntegrationTest do
       assert Code.ensure_loaded?(AshCommanded.Commanded.Verifiers.ValidateProjectionEvents)
       assert Code.ensure_loaded?(AshCommanded.Commanded.Verifiers.ValidateProjectionActions)
       assert Code.ensure_loaded?(AshCommanded.Commanded.Verifiers.ValidateProjectionChanges)
+      assert Code.ensure_loaded?(AshCommanded.Commanded.Verifiers.ValidateEventHandlerEvents)
+      assert Code.ensure_loaded?(AshCommanded.Commanded.Verifiers.ValidateEventHandlerActions)
       
       # Check that the verifier modules implement the Spark.Dsl.Verifier behaviour
       assert Spark.implements_behaviour?(
@@ -45,6 +47,16 @@ defmodule AshCommanded.Commanded.Verifiers.IntegrationTest do
       
       assert Spark.implements_behaviour?(
         AshCommanded.Commanded.Verifiers.ValidateProjectionChanges,
+        Spark.Dsl.Verifier
+      )
+      
+      assert Spark.implements_behaviour?(
+        AshCommanded.Commanded.Verifiers.ValidateEventHandlerEvents,
+        Spark.Dsl.Verifier
+      )
+      
+      assert Spark.implements_behaviour?(
+        AshCommanded.Commanded.Verifiers.ValidateEventHandlerActions,
         Spark.Dsl.Verifier
       )
     end

@@ -2,7 +2,7 @@ defmodule AshCommanded.Commanded.Dsl do
   @moduledoc """
   The DSL extension for using Commanded with Ash resources.
   
-  This extension provides the ability to define commands, events, and projections using Ash resources,
+  This extension provides the ability to define commands, events, projections, and event handlers using Ash resources,
   and integrates with Commanded to provide CQRS and Event Sourcing patterns.
   
   ## Usage
@@ -29,6 +29,16 @@ defmodule AshCommanded.Commanded.Dsl do
       projections do
         projection :user_registered do
           changes(%{status: :active})
+        end
+      end
+      
+      event_handlers do
+        handler :user_registered_notification do
+          events [:user_registered]
+          action fn event, _metadata ->
+            MyApp.Notifications.send_welcome_email(event.email)
+            :ok
+          end
         end
       end
     end
@@ -68,6 +78,16 @@ defmodule AshCommanded.Commanded.Dsl do
     imports: []
   }
   
+  alias AshCommanded.Commanded.Sections.EventHandlersSection
+  
+  @event_handlers_section %Spark.Dsl.Section{
+    name: :event_handlers,
+    describe: "Define general purpose handlers that respond to events",
+    schema: EventHandlersSection.schema(),
+    entities: EventHandlersSection.entities(),
+    imports: []
+  }
+  
   alias AshCommanded.Commanded.Sections.ApplicationSection
   
   @application_section %Spark.Dsl.Section{
@@ -86,6 +106,7 @@ defmodule AshCommanded.Commanded.Dsl do
       @commands_section,
       @events_section,
       @projections_section,
+      @event_handlers_section,
       @application_section
     ]
   }
@@ -98,6 +119,7 @@ defmodule AshCommanded.Commanded.Dsl do
       AshCommanded.Commanded.Transformers.GenerateEventModules,
       AshCommanded.Commanded.Transformers.GenerateProjectionModules,
       AshCommanded.Commanded.Transformers.GenerateProjectorModules,
+      AshCommanded.Commanded.Transformers.GenerateEventHandlerModules,
       AshCommanded.Commanded.Transformers.GenerateAggregateModule,
       AshCommanded.Commanded.Transformers.GenerateDomainRouterModule,
       AshCommanded.Commanded.Transformers.GenerateMainRouterModule,
@@ -110,7 +132,9 @@ defmodule AshCommanded.Commanded.Dsl do
       AshCommanded.Commanded.Verifiers.ValidateEventNames,
       AshCommanded.Commanded.Verifiers.ValidateProjectionEvents,
       AshCommanded.Commanded.Verifiers.ValidateProjectionActions,
-      AshCommanded.Commanded.Verifiers.ValidateProjectionChanges
+      AshCommanded.Commanded.Verifiers.ValidateProjectionChanges,
+      AshCommanded.Commanded.Verifiers.ValidateEventHandlerEvents,
+      AshCommanded.Commanded.Verifiers.ValidateEventHandlerActions
     ]
 
   @doc """
