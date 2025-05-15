@@ -82,6 +82,47 @@ defmodule AshCommanded.Commanded.Sections.CommandsSection do
     docs: ""
   }
   
+  @transaction_entity %Spark.Dsl.Entity{
+    name: :transaction,
+    target: AshCommanded.Commanded.Transaction,
+    schema: [
+      enabled?: [
+        type: :boolean,
+        default: true,
+        doc: "Whether transactions are enabled for this command"
+      ],
+      repo: [
+        type: :atom,
+        doc: "The repository to use for transactions (required if enabled)"
+      ],
+      timeout: [
+        type: :integer,
+        doc: "Transaction timeout in milliseconds"
+      ],
+      isolation_level: [
+        type: {:in, [:read_committed, :repeatable_read, :serializable]},
+        doc: "Transaction isolation level"
+      ]
+    ],
+    imports: [],
+    recursive_as: nil,
+    transform: nil,
+    examples: [],
+    entities: [],
+    singleton_entity_keys: [],
+    deprecations: [],
+    describe: "",
+    snippet: "",
+    args: [],
+    links: nil,
+    hide: [],
+    identifier: nil,
+    modules: [],
+    no_depend_modules: [],
+    auto_set_fields: [],
+    docs: ""
+  }
+  
   @command_entity %Spark.Dsl.Entity{
     name: :command,
     target: AshCommanded.Commanded.Command,
@@ -137,9 +178,26 @@ defmodule AshCommanded.Commanded.Sections.CommandsSection do
       validations: [
         type: {:list, :any},
         doc: "List of parameter validations to apply (used internally)"
+      ],
+      in_transaction?: [
+        type: :boolean,
+        default: false,
+        doc: "Whether to execute the command in a transaction"
+      ],
+      repo: [
+        type: :atom,
+        doc: "The repository to use for transactions (required if in_transaction? is true)"
+      ],
+      transaction_timeout: [
+        type: :integer,
+        doc: "Transaction timeout in milliseconds"
+      ],
+      transaction_isolation_level: [
+        type: {:in, [:read_committed, :repeatable_read, :serializable]},
+        doc: "Transaction isolation level"
       ]
     ],
-    imports: [@transform_params_entity, @validate_params_entity]
+    imports: [@transform_params_entity, @validate_params_entity, @transaction_entity]
   }
   
   def schema do
@@ -153,11 +211,24 @@ defmodule AshCommanded.Commanded.Sections.CommandsSection do
         type: {:list, {:or, [:atom, {:tuple, [:atom, :any]}]}},
         default: [],
         doc: "List of middleware to apply to all commands in this resource. Each entry can be a module or {module, options} tuple."
+      ],
+      # Global transaction options that apply to all commands
+      default_repo: [
+        type: :atom,
+        doc: "The default repository to use for transactions"
+      ],
+      default_transaction_timeout: [
+        type: :integer,
+        doc: "Default transaction timeout in milliseconds"
+      ],
+      default_transaction_isolation_level: [
+        type: {:in, [:read_committed, :repeatable_read, :serializable]},
+        doc: "Default transaction isolation level"
       ]
     ]
   end
   
   def entities do
-    [@command_entity, @transform_params_entity, @validate_params_entity]
+    [@command_entity, @transform_params_entity, @validate_params_entity, @transaction_entity]
   end
 end

@@ -228,6 +228,27 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
           quote do: []
         end
         
+        # Convert command options into quoted AST elements
+        in_transaction_arg = quote do
+          unquote(if command.in_transaction?, do: [in_transaction?: true], else: [])
+        end
+        
+        repo_arg = quote do
+          unquote(if command.repo, do: [repo: command.repo], else: [])
+        end
+        
+        transaction_timeout_arg = quote do
+          unquote(if command.transaction_timeout, 
+            do: [transaction_opts: [timeout: command.transaction_timeout]], 
+            else: [])
+        end
+        
+        transaction_isolation_arg = quote do
+          unquote(if command.transaction_isolation_level, 
+            do: [transaction_opts: [isolation_level: command.transaction_isolation_level]], 
+            else: [])
+        end
+        
         quote do
           @doc """
           Handles the #{unquote(command.name)} command and produces events.
@@ -273,7 +294,14 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
                     ctx.action_name, 
                     ctx.identity_field,
                     unquote(event_module),
-                    unquote(action_type_arg) ++ unquote(param_mapping_arg) ++ [transforms: unquote(Macro.escape(command.transforms || [])), validations: unquote(Macro.escape(command.validations || []))]
+                    unquote(action_type_arg) ++ 
+                    unquote(param_mapping_arg) ++ 
+                    [transforms: unquote(Macro.escape(command.transforms || [])), 
+                     validations: unquote(Macro.escape(command.validations || []))] ++
+                    unquote(in_transaction_arg) ++
+                    unquote(repo_arg) ++
+                    unquote(transaction_timeout_arg) ++
+                    unquote(transaction_isolation_arg)
                   )
                 end
               )

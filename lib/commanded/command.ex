@@ -17,7 +17,12 @@ defmodule AshCommanded.Commanded.Command do
     autogenerate_handler?: boolean(),
     middleware: list(module() | {module(), map()}),
     transforms: list(tuple()),
-    validations: list(tuple())
+    validations: list(tuple()),
+    # Transaction options
+    in_transaction?: boolean(),
+    repo: atom() | nil,
+    transaction_timeout: integer() | nil,
+    transaction_isolation_level: :read_committed | :repeatable_read | :serializable | nil
   }
   
   defstruct [
@@ -32,6 +37,11 @@ defmodule AshCommanded.Commanded.Command do
     autogenerate_handler?: true,
     middleware: [],
     transforms: [],
-    validations: []
+    validations: [],
+    # Transaction options
+    in_transaction?: false,
+    repo: nil,
+    transaction_timeout: nil,
+    transaction_isolation_level: nil
   ]
 end

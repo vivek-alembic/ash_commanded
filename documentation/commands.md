@@ -27,6 +27,22 @@ defmodule ECommerce.Customer do
 
       command :update_status do
         fields([:id, :status])
+        # Enable transaction support
+        in_transaction? true
+        repo ECommerce.Repo
+      end
+      
+      command :deactivate_customer do
+        fields([:id])
+        identity_field(:id)
+        
+        # Use block syntax for transaction options
+        transaction do
+          enabled? true
+          repo ECommerce.Repo
+          timeout 5000 
+          isolation_level :read_committed
+        end
       end
     end
   end
@@ -43,6 +59,12 @@ Each command can have the following options:
 - `handler_name`: Custom name for the handler function (default: :handle)
 - `action`: Ash action to invoke when handling the command (defaults to command name)
 - `command_name`: Override the generated command module name
+- `in_transaction?`: Whether to execute the command in a transaction (boolean)
+- `repo`: The Ecto repository to use for transactions (atom)
+- `transaction_timeout`: The transaction timeout in milliseconds (number)
+- `transaction_isolation_level`: The transaction isolation level (atom)
+
+For detailed information about transaction support, see the [Transactions](transactions.md) documentation.
 
 ## Generated Command Modules
 

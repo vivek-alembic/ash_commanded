@@ -9,6 +9,7 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
   3. Helper functions for command handling
   4. Utilities for applying actions with proper context
   5. Standardized error handling and reporting
+  6. Transaction support for atomic command execution
   
   These utilities are used by generated code (command handlers, aggregates, etc.)
   but can also be used directly in custom implementations.
@@ -16,6 +17,7 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
   
   alias Ash.{Resource, Changeset, Query}
   alias AshCommanded.Commanded.Error
+  alias AshCommanded.Commanded.Transaction
 
   @doc """
   Maps a command to an Ash action and executes it.
@@ -37,6 +39,9 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
   * `:after_action` - Function to call after executing the action
   * `:transforms` - List of parameter transformations to apply
   * `:validations` - List of parameter validations to apply
+  * `:in_transaction?` - Whether to execute the command in a transaction (default: false)
+  * `:repo` - Repository to use for transaction (required if in_transaction? is true)
+  * `:transaction_opts` - Options for the transaction (timeout, isolation_level)
   
   ## Return Values
 
@@ -70,6 +75,17 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
           Map.put(cmd, :created_at, DateTime.utc_now())
         end
       )
+      
+  With transaction support:
+  
+      map_to_action(
+        %MyApp.Commands.RegisterUser{},
+        MyApp.User,
+        :create,
+        in_transaction?: true,
+        repo: MyApp.Repo,
+        transaction_opts: [timeout: 30_000]
+      )
   """
   @spec map_to_action(struct(), module(), atom(), keyword()) :: 
     {:ok, Resource.record()} | {:error, Error.t() | [Error.t()]}
@@ -83,6 +99,44 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
     before_action = Keyword.get(opts, :before_action)
     after_action = Keyword.get(opts, :after_action)
     
+    # Transaction options
+    in_transaction? = Keyword.get(opts, :in_transaction?, false)
+    repo = Keyword.get(opts, :repo)
+    transaction_opts = Keyword.get(opts, :transaction_opts, [])
+    
+    # Decide whether to execute in a transaction or not
+    if in_transaction? && repo do
+      # Check if the repo supports transactions
+      if Transaction.supports_transactions?(repo) do
+        # Execute in a transaction
+        Transaction.run(repo, fn ->
+          execute_action_internal(
+            command, resource, action_name, action_type, identity_field,
+            param_mapping, transforms, validations, context,
+            before_action, after_action
+          )
+        end, transaction_opts)
+      else
+        # Repository doesn't support transactions
+        {:error, Error.command_error("Repository does not support transactions", 
+          context: %{repo: repo, command: command.__struct__})}
+      end
+    else
+      # Execute without a transaction
+      execute_action_internal(
+        command, resource, action_name, action_type, identity_field,
+        param_mapping, transforms, validations, context,
+        before_action, after_action
+      )
+    end
+  end
+  
+  # Internal function to execute action (with or without transaction)
+  defp execute_action_internal(
+    command, resource, action_name, action_type, identity_field,
+    param_mapping, transforms, validations, context,
+    before_action, after_action
+  ) do
     # Apply parameter transformations
     # 1. First apply basic param_mapping
     transform_result = safely_transform_params(command, param_mapping)
@@ -150,6 +204,58 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
     end
   end
   
+  @doc """
+  Maps and executes multiple commands in a single transaction.
+  
+  ## Parameters
+  
+  * `commands` - List of command specifications
+  * `repo` - Repository to use for the transaction
+  * `opts` - Transaction options
+  
+  ## Command Specifications
+  
+  Each command specification is a map with the following keys:
+  * `:command` - The command struct to execute
+  * `:resource` - The Ash resource module
+  * `:action` - The action name
+  * `:opts` - (Optional) Command-specific options
+  
+  ## Return Values
+  
+  * `{:ok, results}` - All commands executed successfully, with a map of results
+  * `{:error, failed_operation, error, results_so_far}` - Transaction failed
+  
+  ## Examples
+  
+  ```elixir
+  AshCommanded.Commanded.CommandActionMapper.transactional_map_to_action([
+    %{
+      command: %MyApp.Commands.RegisterUser{name: "John", email: "john@example.com"},
+      resource: MyApp.User,
+      action: :create
+    },
+    %{
+      command: %MyApp.Commands.CreateProfile{user_id: "123", bio: "Developer"},
+      resource: MyApp.Profile,
+      action: :create,
+      opts: [param_mapping: %{user_id: :owner_id}]
+    }
+  ], MyApp.Repo)
+  ```
+  """
+  @spec transactional_map_to_action([map()], module(), keyword()) :: 
+    {:ok, map()} | {:error, atom(), any(), %{atom() => any()}}
+  def transactional_map_to_action(commands, repo, opts \\ []) do
+    # Check if the repo supports transactions
+    if Transaction.supports_transactions?(repo) do
+      Transaction.execute_commands(repo, commands, opts)
+    else
+      {:error, :transaction_error, Error.command_error("Repository does not support transactions", 
+        context: %{repo: repo}), %{}}
+    end
+  end
+
   @doc """
   Infers the action type based on the action name.
   
@@ -222,7 +328,7 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
   end
 
   # Safely apply pre-processor with error handling
-  defp safely_apply_preprocessor(params, command, nil), do: {:ok, params}
+  defp safely_apply_preprocessor(params, _command, nil), do: {:ok, params}
   defp safely_apply_preprocessor(params, command, before_action) when is_function(before_action) do
     try do
       {:ok, before_action.(params, command)}
@@ -238,8 +344,8 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
   end
 
   # Safely apply post-processor with error handling
-  defp safely_apply_postprocessor(result, command, nil), do: result
-  defp safely_apply_postprocessor({:ok, record} = result, command, after_action) when is_function(after_action) do
+  defp safely_apply_postprocessor(result, _command, nil), do: result
+  defp safely_apply_postprocessor({:ok, _record} = result, command, after_action) when is_function(after_action) do
     try do
       after_action.(result, command) || result
     rescue
@@ -319,7 +425,7 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
         {:ok, %{action: action_name, params: params, identity: identity_value, context: context}}
       else
         query = resource |> Ash.Query.for_read(:by_id) |> Ash.Query.set_context(context)
-        query = Ash.Query.filter(query, ^{identity_field, :==, identity_value})
+        query = Ash.Query.filter(query, [{identity_field, :==, identity_value}])
         
         case Ash.read_one(query) do
           {:ok, record} ->
@@ -357,7 +463,7 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
         {:ok, %{action: action_name, identity: identity_value, context: context}}
       else
         query = resource |> Ash.Query.for_read(:by_id) |> Ash.Query.set_context(context)
-        query = Ash.Query.filter(query, ^{identity_field, :==, identity_value})
+        query = Ash.Query.filter(query, [{identity_field, :==, identity_value}])
         
         case Ash.read_one(query) do
           {:ok, record} ->
@@ -395,7 +501,7 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
         {:ok, %{action: action_name, identity: identity_value, context: context}}
       else
         query = resource |> Ash.Query.for_read(action_name) |> Ash.Query.set_context(context)
-        query = Ash.Query.filter(query, ^{identity_field, :==, identity_value})
+        query = Ash.Query.filter(query, [{identity_field, :==, identity_value}])
         
         case Ash.read_one(query) do
           {:ok, record} ->
