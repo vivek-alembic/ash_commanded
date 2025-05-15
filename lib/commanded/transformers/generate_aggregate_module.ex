@@ -208,6 +208,21 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
       if command_module && matching_event && event_module do
         # Generate a command handler that returns the matching event
         identity_field = command.identity_field || :id
+        action_name = command.action || command.name
+        
+        # Determine action type or leave it to be inferred
+        action_type_arg = if command.action_type do
+          quote do: [action_type: unquote(command.action_type)]
+        else
+          quote do: []
+        end
+        
+        # Add param mapping if provided
+        param_mapping_arg = if command.param_mapping do
+          quote do: [param_mapping: unquote(command.param_mapping)]
+        else
+          quote do: []
+        end
         
         quote do
           @doc """
@@ -226,13 +241,53 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
           def execute(%__MODULE__{} = aggregate, %unquote(command_module){} = command) do
             # For a new aggregate - nil id means it doesn't exist yet
             if is_nil(aggregate.unquote(identity_field)) do
-              # Create a new entity - return event with command fields
-              {:ok, struct(unquote(event_module), Map.from_struct(command))}
+              # Implementation for new aggregates
+              resource_module = command.__struct__
+                |> Module.split()
+                |> Enum.drop(-2)  # Remove "Commands" and command name
+                |> Module.concat()
+              
+              # Use CommandActionMapper to map command to action
+              opts = unquote(action_type_arg) ++ 
+                     unquote(param_mapping_arg) ++ 
+                     [identity_field: unquote(identity_field)]
+              
+              # Convert action result to an event
+              case AshCommanded.Commanded.CommandActionMapper.map_to_action(
+                command, resource_module, unquote(action_name), opts
+              ) do
+                {:ok, _result} ->
+                  # Return the event with command fields
+                  {:ok, struct(unquote(event_module), Map.from_struct(command))}
+                
+                {:error, reason} ->
+                  {:error, reason}
+              end
             else
-              # For existing aggregate - check that we're updating the correct one
+              # For existing aggregate, check identity
               if aggregate.unquote(identity_field) == command.unquote(identity_field) do
-                # Update existing entity - return event with command fields
-                {:ok, struct(unquote(event_module), Map.from_struct(command))}
+                # Implementation for existing aggregates
+                resource_module = command.__struct__
+                  |> Module.split()
+                  |> Enum.drop(-2)  # Remove "Commands" and command name
+                  |> Module.concat()
+                
+                # Use CommandActionMapper to map command to action
+                opts = unquote(action_type_arg) ++ 
+                       unquote(param_mapping_arg) ++ 
+                       [identity_field: unquote(identity_field)]
+                
+                # Convert action result to an event
+                case AshCommanded.Commanded.CommandActionMapper.map_to_action(
+                  command, resource_module, unquote(action_name), opts
+                ) do
+                  {:ok, _result} ->
+                    # Return the event with command fields
+                    {:ok, struct(unquote(event_module), Map.from_struct(command))}
+                  
+                  {:error, reason} ->
+                    {:error, reason}
+                end
               else
                 # Identity field mismatch
                 {:error, :invalid_identity}

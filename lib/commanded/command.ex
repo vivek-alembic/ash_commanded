@@ -10,6 +10,8 @@ defmodule AshCommanded.Commanded.Command do
     fields: [atom()],
     identity_field: atom() | nil,
     action: atom() | nil,
+    action_type: :create | :update | :destroy | :read | :custom | nil,
+    param_mapping: map() | (map() -> map()) | (map(), struct() -> map()) | nil,
     command_name: atom() | nil,
     handler_name: atom() | nil,
     autogenerate_handler?: boolean()
@@ -20,6 +22,8 @@ defmodule AshCommanded.Commanded.Command do
     :fields,
     :identity_field,
     :action,
+    :action_type,
+    :param_mapping,
     :command_name,
     :handler_name,
     autogenerate_handler?: true

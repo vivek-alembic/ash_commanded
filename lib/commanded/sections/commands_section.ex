@@ -29,6 +29,14 @@ defmodule AshCommanded.Commanded.Sections.CommandsSection do
         type: :atom,
         doc: "The Ash action to call when handling this command. Defaults to the command name."
       ],
+      action_type: [
+        type: {:in, [:create, :update, :destroy, :read, :custom]},
+        doc: "The type of action (:create, :update, :destroy, :read, or :custom). If not specified, inferred from the action name."
+      ],
+      param_mapping: [
+        type: {:or, [:map, :quoted]},
+        doc: "A map or function for transforming command fields to action params."
+      ],
       command_name: [
         type: :atom,
         doc: "Override the auto-generated command module name"
