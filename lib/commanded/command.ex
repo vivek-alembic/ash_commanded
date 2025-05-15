@@ -15,7 +15,9 @@ defmodule AshCommanded.Commanded.Command do
     command_name: atom() | nil,
     handler_name: atom() | nil,
     autogenerate_handler?: boolean(),
-    middleware: list(module() | {module(), map()})
+    middleware: list(module() | {module(), map()}),
+    transforms: list(tuple()),
+    validations: list(tuple())
   }
   
   defstruct [
@@ -28,6 +30,8 @@ defmodule AshCommanded.Commanded.Command do
     :command_name,
     :handler_name,
     autogenerate_handler?: true,
-    middleware: []
+    middleware: [],
+    transforms: [],
+    validations: []
   ]
 end

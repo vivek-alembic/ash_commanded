@@ -68,36 +68,62 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
     action_type = Keyword.get(opts, :action_type) || infer_action_type(action_name)
     identity_field = Keyword.get(opts, :identity_field, :id)
     param_mapping = Keyword.get(opts, :param_mapping)
+    transforms = Keyword.get(opts, :transforms, [])
+    validations = Keyword.get(opts, :validations, [])
     context = Keyword.get(opts, :context, %{})
     before_action = Keyword.get(opts, :before_action)
     after_action = Keyword.get(opts, :after_action)
     
-    # Convert command to params based on mapping
+    # Apply parameter transformations
+    # 1. First apply basic param_mapping
     params = transform_params(command, param_mapping)
     
-    # Allow custom pre-processing
+    # 2. Then apply advanced transformations from DSL if available
+    params = 
+      if Enum.empty?(transforms) do
+        params
+      else
+        AshCommanded.Commanded.ParameterTransformer.transform_params(params, transforms)
+      end
+    
+    # 3. Apply custom pre-processing function if provided
     params = if before_action && is_function(before_action), 
       do: before_action.(params, command), 
       else: params
     
-    # Execute the appropriate action type
-    result =
-      case action_type do
-        :create -> execute_create(resource, action_name, params, context)
-        :update -> execute_update(resource, action_name, params, identity_field, context)
-        :destroy -> execute_destroy(resource, action_name, params, identity_field, context)
-        :read -> execute_read(resource, action_name, params, identity_field, context)
-        :custom -> execute_custom(resource, action_name, params, context)
+    # Validate parameters if validations are specified
+    validation_result = 
+      if Enum.empty?(validations) do
+        :ok
+      else
+        AshCommanded.Commanded.ParameterValidator.validate_params(params, validations)
       end
     
-    # Allow custom post-processing
-    if after_action && is_function(after_action) do
-      case result do
-        {:ok, _record} = success -> after_action.(success, command) || success
-        error -> error
-      end
-    else
-      result
+    # Process based on validation result
+    case validation_result do
+      :ok ->
+        # Execute the appropriate action type
+        result =
+          case action_type do
+            :create -> execute_create(resource, action_name, params, context)
+            :update -> execute_update(resource, action_name, params, identity_field, context)
+            :destroy -> execute_destroy(resource, action_name, params, identity_field, context)
+            :read -> execute_read(resource, action_name, params, identity_field, context)
+            :custom -> execute_custom(resource, action_name, params, context)
+          end
+        
+        # Allow custom post-processing
+        if after_action && is_function(after_action) do
+          case result do
+            {:ok, _record} = success -> after_action.(success, command) || success
+            error -> error
+          end
+        else
+          result
+        end
+        
+      {:error, validation_errors} ->
+        {:error, {:validation_error, validation_errors}}
     end
   end
   

@@ -268,7 +268,7 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
                   ctx.action_name, 
                   ctx.identity_field,
                   unquote(event_module),
-                  unquote(action_type_arg) ++ unquote(param_mapping_arg)
+                  unquote(action_type_arg) ++ unquote(param_mapping_arg) ++ [transforms: unquote(Macro.escape(command.transforms || [])), validations: unquote(Macro.escape(command.validations || []))]
                 )
               end
             )

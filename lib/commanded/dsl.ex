@@ -115,6 +115,8 @@ defmodule AshCommanded.Commanded.Dsl do
   use Spark.Dsl.Extension,
     sections: [@commanded_section],
     transformers: [
+      AshCommanded.Commanded.Transformers.CollectParameterTransforms,
+      AshCommanded.Commanded.Transformers.CollectParameterValidations,
       AshCommanded.Commanded.Transformers.GenerateCommandModules,
       AshCommanded.Commanded.Transformers.GenerateEventModules,
       AshCommanded.Commanded.Transformers.GenerateProjectionModules,

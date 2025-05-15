@@ -6,6 +6,82 @@ defmodule AshCommanded.Commanded.Sections.CommandsSection do
   in the Commanded CQRS/ES library.
   """
   
+  @transform_params_entity %Spark.Dsl.Entity{
+    name: :transform_params,
+    target: AshCommanded.Commanded.ParameterTransformer,
+    schema: [
+      map: [
+        type: {:list, :any},
+        doc: "Maps a field from one name to another"
+      ],
+      cast: [
+        type: {:list, :any},
+        doc: "Casts a field to a specific type"
+      ],
+      compute: [
+        type: {:list, :any},
+        doc: "Computes a field value using a function"
+      ],
+      transform: [
+        type: {:list, :any},
+        doc: "Transforms a field value using a function"
+      ],
+      default: [
+        type: {:list, :any},
+        doc: "Sets a default value for a field"
+      ],
+      custom: [
+        type: {:list, :any},
+        doc: "Applies a custom transformation function to the entire params map"
+      ]
+    ],
+    imports: [],
+    recursive_as: nil,
+    transform: nil,
+    examples: [],
+    entities: [],
+    singleton_entity_keys: [],
+    deprecations: [],
+    describe: "",
+    snippet: "",
+    args: [],
+    links: nil,
+    hide: [],
+    identifier: nil,
+    modules: [],
+    no_depend_modules: [],
+    auto_set_fields: [],
+    docs: ""
+  }
+  
+  @validate_params_entity %Spark.Dsl.Entity{
+    name: :validate_params,
+    target: AshCommanded.Commanded.ParameterValidator,
+    schema: [
+      validate: [
+        type: {:list, :any},
+        doc: "Validates a field against rules or using a function"
+      ]
+    ],
+    imports: [],
+    recursive_as: nil,
+    transform: nil,
+    examples: [],
+    entities: [],
+    singleton_entity_keys: [],
+    deprecations: [],
+    describe: "",
+    snippet: "",
+    args: [],
+    links: nil,
+    hide: [],
+    identifier: nil,
+    modules: [],
+    no_depend_modules: [],
+    auto_set_fields: [],
+    docs: ""
+  }
+  
   @command_entity %Spark.Dsl.Entity{
     name: :command,
     target: AshCommanded.Commanded.Command,
@@ -53,9 +129,17 @@ defmodule AshCommanded.Commanded.Sections.CommandsSection do
       middleware: [
         type: {:list, {:or, [:atom, {:tuple, [:atom, :any]}]}},
         doc: "List of middleware to apply to this command. Each entry can be a module or {module, options} tuple."
+      ],
+      transforms: [
+        type: {:list, :any},
+        doc: "List of parameter transformations to apply (used internally)"
+      ],
+      validations: [
+        type: {:list, :any},
+        doc: "List of parameter validations to apply (used internally)"
       ]
     ],
-    imports: []
+    imports: [@transform_params_entity, @validate_params_entity]
   }
   
   def schema do
@@ -74,6 +158,6 @@ defmodule AshCommanded.Commanded.Sections.CommandsSection do
   end
   
   def entities do
-    [@command_entity]
+    [@command_entity, @transform_params_entity, @validate_params_entity]
   end
 end
