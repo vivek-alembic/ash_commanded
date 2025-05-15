@@ -6,7 +6,7 @@ defmodule AshCommanded.Commanded.ParameterValidator do
   ensuring they meet specific criteria before being processed by actions.
   
   Validation features include:
-  
+
   1. Type checking - Ensure values match expected types
   2. Format validation - Validate strings with regular expressions
   3. Range validation - Check numeric values against ranges
@@ -70,6 +70,8 @@ defmodule AshCommanded.Commanded.ParameterValidator do
   ```
   """
   
+  alias AshCommanded.Commanded.Error
+
   @doc """
   Validates parameters against a validation specification.
   
@@ -84,7 +86,7 @@ defmodule AshCommanded.Commanded.ParameterValidator do
   ## Returns
   
   * `:ok` - If all validations pass
-  * `{:error, errors}` - If any validations fail, with errors being a list of failure messages
+  * `{:error, errors}` - If any validations fail, with errors being a list of validation error structs
   
   ## Example
   
@@ -97,10 +99,11 @@ defmodule AshCommanded.Commanded.ParameterValidator do
       {:validate, :age, [type: :integer, min: 18]}
     ]
   )
-  # => {:error, ["email does not match required format", "age must be at least 18"]}
+  # => {:error, [%Error{type: :validation_error, message: "does not match required format", field: :email}, 
+  #              %Error{type: :validation_error, message: "must be at least 18", field: :age}]}
   ```
   """
-  @spec validate_params(map(), list()) :: :ok | {:error, list(String.t())}
+  @spec validate_params(map(), list()) :: :ok | {:error, list(Error.t())}
   def validate_params(params, validations) when is_map(params) and is_list(validations) do
     validation_results =
       Enum.flat_map(validations, fn validation_spec ->
@@ -126,7 +129,7 @@ defmodule AshCommanded.Commanded.ParameterValidator do
     else
       # If the field is required, we return an error; otherwise, we accept it
       if Keyword.get(rules, :required, false) do
-        ["#{field} is required"]
+        [Error.validation_error("is required", field: field)]
       else
         []
       end
@@ -139,8 +142,8 @@ defmodule AshCommanded.Commanded.ParameterValidator do
       
       case validation_fn.(value) do
         :ok -> []
-        {:error, message} -> ["#{field}: #{message}"]
-        _other -> ["#{field} failed custom validation"]
+        {:error, message} -> [Error.validation_error(message, field: field, value: value)]
+        _other -> [Error.validation_error("failed custom validation", field: field, value: value)]
       end
     else
       []
@@ -156,7 +159,7 @@ defmodule AshCommanded.Commanded.ParameterValidator do
     if valid_type?(value, expected_type) do
       []
     else
-      ["#{field} must be of type #{expected_type}"]
+      [Error.validation_error("must be of type #{expected_type}", field: field, value: value)]
     end
   end
   
@@ -164,7 +167,7 @@ defmodule AshCommanded.Commanded.ParameterValidator do
     if Regex.match?(pattern, value) do
       []
     else
-      ["#{field} does not match required format"]
+      [Error.validation_error("does not match required format", field: field, value: value, context: %{pattern: inspect(pattern)})]
     end
   end
   
@@ -172,7 +175,7 @@ defmodule AshCommanded.Commanded.ParameterValidator do
     if value >= min_value do
       []
     else
-      ["#{field} must be at least #{min_value}"]
+      [Error.validation_error("must be at least #{min_value}", field: field, value: value)]
     end
   end
   
@@ -180,7 +183,7 @@ defmodule AshCommanded.Commanded.ParameterValidator do
     if value <= max_value do
       []
     else
-      ["#{field} must be at most #{max_value}"]
+      [Error.validation_error("must be at most #{max_value}", field: field, value: value)]
     end
   end
   
@@ -188,7 +191,7 @@ defmodule AshCommanded.Commanded.ParameterValidator do
     if String.length(value) >= min_length do
       []
     else
-      ["#{field} must be at least #{min_length} characters long"]
+      [Error.validation_error("must be at least #{min_length} characters long", field: field, value: value)]
     end
   end
   
@@ -196,7 +199,7 @@ defmodule AshCommanded.Commanded.ParameterValidator do
     if String.length(value) <= max_length do
       []
     else
-      ["#{field} must be at most #{max_length} characters long"]
+      [Error.validation_error("must be at most #{max_length} characters long", field: field, value: value)]
     end
   end
   
@@ -204,7 +207,7 @@ defmodule AshCommanded.Commanded.ParameterValidator do
     if length(value) >= min_items do
       []
     else
-      ["#{field} must contain at least #{min_items} items"]
+      [Error.validation_error("must contain at least #{min_items} items", field: field, value: value)]
     end
   end
   
@@ -212,7 +215,7 @@ defmodule AshCommanded.Commanded.ParameterValidator do
     if length(value) <= max_items do
       []
     else
-      ["#{field} must contain at most #{max_items} items"]
+      [Error.validation_error("must contain at most #{max_items} items", field: field, value: value)]
     end
   end
   
@@ -220,7 +223,7 @@ defmodule AshCommanded.Commanded.ParameterValidator do
     if value in allowed_values do
       []
     else
-      ["#{field} must be one of: #{inspect(allowed_values)}"]
+      [Error.validation_error("must be one of: #{inspect(allowed_values)}", field: field, value: value)]
     end
   end
   
@@ -228,15 +231,15 @@ defmodule AshCommanded.Commanded.ParameterValidator do
     if Enum.all?(value, &(&1 in allowed_values)) do
       []
     else
-      ["#{field} contains values not in the allowed set: #{inspect(allowed_values)}"]
+      [Error.validation_error("contains values not in the allowed set: #{inspect(allowed_values)}", field: field, value: value)]
     end
   end
   
   defp validate_field(field, value, {:custom, validation_fn}) when is_function(validation_fn, 1) do
     case validation_fn.(value) do
       :ok -> []
-      {:error, message} -> ["#{field}: #{message}"]
-      _other -> ["#{field} failed custom validation"]
+      {:error, message} -> [Error.validation_error(message, field: field, value: value)]
+      _other -> [Error.validation_error("failed custom validation", field: field, value: value)]
     end
   end
   

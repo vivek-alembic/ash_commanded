@@ -8,13 +8,15 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
   2. Support for different action types (create, update, destroy, etc.)
   3. Helper functions for command handling
   4. Utilities for applying actions with proper context
+  5. Standardized error handling and reporting
   
   These utilities are used by generated code (command handlers, aggregates, etc.)
   but can also be used directly in custom implementations.
   """
   
   alias Ash.{Resource, Changeset, Query}
-  
+  alias AshCommanded.Commanded.Error
+
   @doc """
   Maps a command to an Ash action and executes it.
   
@@ -33,6 +35,13 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
   * `:context` - Context to pass to the Ash action
   * `:before_action` - Function to call before executing the action
   * `:after_action` - Function to call after executing the action
+  * `:transforms` - List of parameter transformations to apply
+  * `:validations` - List of parameter validations to apply
+  
+  ## Return Values
+
+  * `{:ok, record}` - The action was executed successfully, returning the record
+  * `{:error, error}` - An error occurred. The error will be a standardized AshCommanded.Commanded.Error or list of errors
   
   ## Examples
   
@@ -63,7 +72,7 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
       )
   """
   @spec map_to_action(struct(), module(), atom(), keyword()) :: 
-    {:ok, Resource.record()} | {:error, term()}
+    {:ok, Resource.record()} | {:error, Error.t() | [Error.t()]}
   def map_to_action(command, resource, action_name, opts \\ []) do
     action_type = Keyword.get(opts, :action_type) || infer_action_type(action_name)
     identity_field = Keyword.get(opts, :identity_field, :id)
@@ -76,54 +85,68 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
     
     # Apply parameter transformations
     # 1. First apply basic param_mapping
-    params = transform_params(command, param_mapping)
+    transform_result = safely_transform_params(command, param_mapping)
     
-    # 2. Then apply advanced transformations from DSL if available
-    params = 
-      if Enum.empty?(transforms) do
-        params
-      else
-        AshCommanded.Commanded.ParameterTransformer.transform_params(params, transforms)
-      end
-    
-    # 3. Apply custom pre-processing function if provided
-    params = if before_action && is_function(before_action), 
-      do: before_action.(params, command), 
-      else: params
-    
-    # Validate parameters if validations are specified
-    validation_result = 
-      if Enum.empty?(validations) do
-        :ok
-      else
-        AshCommanded.Commanded.ParameterValidator.validate_params(params, validations)
-      end
-    
-    # Process based on validation result
-    case validation_result do
-      :ok ->
-        # Execute the appropriate action type
-        result =
-          case action_type do
-            :create -> execute_create(resource, action_name, params, context)
-            :update -> execute_update(resource, action_name, params, identity_field, context)
-            :destroy -> execute_destroy(resource, action_name, params, identity_field, context)
-            :read -> execute_read(resource, action_name, params, identity_field, context)
-            :custom -> execute_custom(resource, action_name, params, context)
+    case transform_result do
+      {:ok, params} ->
+        # 2. Then apply advanced transformations from DSL if available
+        transform_result =
+          if Enum.empty?(transforms) do
+            {:ok, params}
+          else
+            safely_apply_advanced_transforms(params, transforms)
           end
         
-        # Allow custom post-processing
-        if after_action && is_function(after_action) do
-          case result do
-            {:ok, _record} = success -> after_action.(success, command) || success
-            error -> error
-          end
-        else
-          result
+        case transform_result do
+          {:ok, params} ->
+            # 3. Apply custom pre-processing function if provided
+            pre_process_result = safely_apply_preprocessor(params, command, before_action)
+            
+            case pre_process_result do
+              {:ok, params} ->
+                # 4. Validate parameters if validations are specified
+                validation_result = 
+                  if Enum.empty?(validations) do
+                    :ok
+                  else
+                    AshCommanded.Commanded.ParameterValidator.validate_params(params, validations)
+                  end
+                
+                # Process based on validation result
+                case validation_result do
+                  :ok ->
+                    # Execute the appropriate action type
+                    action_result =
+                      case action_type do
+                        :create -> execute_create(resource, action_name, params, context)
+                        :update -> execute_update(resource, action_name, params, identity_field, context)
+                        :destroy -> execute_destroy(resource, action_name, params, identity_field, context)
+                        :read -> execute_read(resource, action_name, params, identity_field, context)
+                        :custom -> execute_custom(resource, action_name, params, context)
+                      end
+                    
+                    case action_result do
+                      {:ok, _record} = success ->
+                        # Apply post-processor if available
+                        safely_apply_postprocessor(success, command, after_action)
+                      
+                      {:error, error} ->
+                        # Standardize the error format
+                        {:error, Error.normalize_error(error)}
+                    end
+                    
+                  {:error, validation_errors} ->
+                    # Validation errors are already standardized
+                    {:error, validation_errors}
+                end
+              
+              {:error, error} -> {:error, error}
+            end
+          
+          {:error, error} -> {:error, error}
         end
-        
-      {:error, validation_errors} ->
-        {:error, {:validation_error, validation_errors}}
+      
+      {:error, error} -> {:error, error}
     end
   end
   
@@ -165,6 +188,68 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
         
       true ->
         :custom
+    end
+  end
+  
+  # Safely transform params with error handling
+  defp safely_transform_params(command, mapping) do
+    try do
+      {:ok, transform_params(command, mapping)}
+    rescue
+      e in _ ->
+        {:error, Error.transformation_error("Error transforming command parameters: #{Exception.message(e)}", 
+          context: %{
+            command: inspect(command),
+            mapping: inspect(mapping),
+            error: inspect(e)
+          })}
+    end
+  end
+
+  # Safely apply advanced transforms with error handling
+  defp safely_apply_advanced_transforms(params, transforms) do
+    try do
+      {:ok, AshCommanded.Commanded.ParameterTransformer.transform_params(params, transforms)}
+    rescue
+      e in _ ->
+        {:error, Error.transformation_error("Error applying parameter transforms: #{Exception.message(e)}", 
+          context: %{
+            params: inspect(params),
+            transforms: inspect(transforms),
+            error: inspect(e)
+          })}
+    end
+  end
+
+  # Safely apply pre-processor with error handling
+  defp safely_apply_preprocessor(params, command, nil), do: {:ok, params}
+  defp safely_apply_preprocessor(params, command, before_action) when is_function(before_action) do
+    try do
+      {:ok, before_action.(params, command)}
+    rescue
+      e in _ ->
+        {:error, Error.command_error("Error in command pre-processor: #{Exception.message(e)}", 
+          context: %{
+            params: inspect(params),
+            command: inspect(command),
+            error: inspect(e)
+          })}
+    end
+  end
+
+  # Safely apply post-processor with error handling
+  defp safely_apply_postprocessor(result, command, nil), do: result
+  defp safely_apply_postprocessor({:ok, record} = result, command, after_action) when is_function(after_action) do
+    try do
+      after_action.(result, command) || result
+    rescue
+      e in _ ->
+        {:error, Error.command_error("Error in command post-processor: #{Exception.message(e)}", 
+          context: %{
+            result: inspect(result),
+            command: inspect(command),
+            error: inspect(e)
+          })}
     end
   end
   
@@ -212,7 +297,14 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
     if Mix.env() == :test do
       {:ok, %{action: action_name, params: params, context: context}}
     else
-      {:error, :not_implemented_in_test}
+      changeset = Ash.Changeset.new(resource)
+      changeset = Ash.Changeset.for_action(changeset, action_name, params)
+      changeset = Ash.Changeset.set_context(changeset, context)
+      
+      case Ash.create(changeset) do
+        {:ok, _} = success -> success
+        {:error, error} -> {:error, error}
+      end
     end
   end
   
@@ -226,10 +318,31 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
       if Mix.env() == :test do
         {:ok, %{action: action_name, params: params, identity: identity_value, context: context}}
       else
-        {:error, :not_implemented_in_test}
+        query = resource |> Ash.Query.for_read(:by_id) |> Ash.Query.set_context(context)
+        query = Ash.Query.filter(query, ^{identity_field, :==, identity_value})
+        
+        case Ash.read_one(query) do
+          {:ok, record} ->
+            changeset = Ash.Changeset.new(record)
+            changeset = Ash.Changeset.for_action(changeset, action_name, params)
+            changeset = Ash.Changeset.set_context(changeset, context)
+            
+            Ash.update(changeset)
+            
+          {:error, error} ->
+            {:error, error}
+            
+          nil ->
+            {:error, Error.action_error("Record not found", 
+              field: identity_field, 
+              value: identity_value,
+              context: %{resource: resource, action: action_name})}
+        end
       end
     else
-      {:error, :missing_identity_field}
+      {:error, Error.command_error("Missing identity field", 
+        field: identity_field, 
+        context: %{resource: resource, action: action_name})}
     end
   end
   
@@ -243,10 +356,31 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
       if Mix.env() == :test do
         {:ok, %{action: action_name, identity: identity_value, context: context}}
       else
-        {:error, :not_implemented_in_test}
+        query = resource |> Ash.Query.for_read(:by_id) |> Ash.Query.set_context(context)
+        query = Ash.Query.filter(query, ^{identity_field, :==, identity_value})
+        
+        case Ash.read_one(query) do
+          {:ok, record} ->
+            changeset = Ash.Changeset.new(record)
+            changeset = Ash.Changeset.for_action(changeset, action_name, params)
+            changeset = Ash.Changeset.set_context(changeset, context)
+            
+            Ash.destroy(changeset)
+            
+          {:error, error} ->
+            {:error, error}
+            
+          nil ->
+            {:error, Error.action_error("Record not found", 
+              field: identity_field, 
+              value: identity_value,
+              context: %{resource: resource, action: action_name})}
+        end
       end
     else
-      {:error, :missing_identity_field}
+      {:error, Error.command_error("Missing identity field", 
+        field: identity_field, 
+        context: %{resource: resource, action: action_name})}
     end
   end
   
@@ -260,10 +394,27 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
       if Mix.env() == :test do
         {:ok, %{action: action_name, identity: identity_value, context: context}}
       else
-        {:error, :not_implemented_in_test}
+        query = resource |> Ash.Query.for_read(action_name) |> Ash.Query.set_context(context)
+        query = Ash.Query.filter(query, ^{identity_field, :==, identity_value})
+        
+        case Ash.read_one(query) do
+          {:ok, record} ->
+            {:ok, record}
+            
+          {:error, error} ->
+            {:error, error}
+            
+          nil ->
+            {:error, Error.action_error("Record not found", 
+              field: identity_field, 
+              value: identity_value,
+              context: %{resource: resource, action: action_name})}
+        end
       end
     else
-      {:error, :missing_identity_field}
+      {:error, Error.command_error("Missing identity field", 
+        field: identity_field, 
+        context: %{resource: resource, action: action_name})}
     end
   end
   
@@ -274,7 +425,20 @@ defmodule AshCommanded.Commanded.CommandActionMapper do
     if Mix.env() == :test do
       {:ok, %{action: action_name, params: params, context: context}}
     else
-      {:error, :not_implemented_in_test}
+      # For custom actions, we'll use Ash.run_action which allows any type of action
+      try do
+        params_with_context = Map.put(params, :context, context)
+        Ash.run_action(resource, action_name, params_with_context)
+      rescue
+        e in _ ->
+          {:error, Error.action_error("Error running custom action: #{Exception.message(e)}", 
+            context: %{
+              resource: resource,
+              action: action_name,
+              params: inspect(params),
+              error: inspect(e)
+            })}
+      end
     end
   end
 end

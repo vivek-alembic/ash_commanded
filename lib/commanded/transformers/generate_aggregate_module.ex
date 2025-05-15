@@ -74,6 +74,7 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
   alias AshCommanded.Commanded.Transformers.BaseTransformer
   alias AshCommanded.Commanded.Transformers.GenerateCommandModules
   alias AshCommanded.Commanded.Transformers.GenerateEventModules
+  alias AshCommanded.Commanded.Error
   
   @doc """
   Specifies that this transformer should run after the command and event module transformers.
@@ -182,6 +183,9 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
     quote do
       @moduledoc unquote(moduledoc)
       
+      # Import the Error module for standardized error handling
+      alias AshCommanded.Commanded.Error
+      
       # Define the aggregate state struct with all resource attributes
       defstruct unquote(struct_fields)
       
@@ -236,7 +240,7 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
           ## Returns
           
           - `{:ok, event}` - When command is successfully executed
-          - `{:error, reason}` - When command execution fails
+          - `{:error, error}` - When command execution fails with standardized error
           """
           def execute(%__MODULE__{} = aggregate, %unquote(command_module){} = command) do
             # Extract resource module from command
@@ -254,48 +258,65 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
               param_mapping: unquote(command.param_mapping)
             }
             
-            # Apply middleware and execute command
-            AshCommanded.Commanded.Middleware.CommandMiddlewareProcessor.apply_middleware(
-              command,
-              resource_module,
-              context,
-              fn cmd, ctx ->
-                # This is the final handler that runs after all middleware
-                process_command(
-                  ctx.aggregate, 
-                  cmd, 
-                  resource_module, 
-                  ctx.action_name, 
-                  ctx.identity_field,
-                  unquote(event_module),
-                  unquote(action_type_arg) ++ unquote(param_mapping_arg) ++ [transforms: unquote(Macro.escape(command.transforms || [])), validations: unquote(Macro.escape(command.validations || []))]
-                )
-              end
-            )
+            # Apply middleware and execute command in a try-rescue block
+            try do
+              AshCommanded.Commanded.Middleware.CommandMiddlewareProcessor.apply_middleware(
+                command,
+                resource_module,
+                context,
+                fn cmd, ctx ->
+                  # This is the final handler that runs after all middleware
+                  process_command(
+                    ctx.aggregate, 
+                    cmd, 
+                    resource_module, 
+                    ctx.action_name, 
+                    ctx.identity_field,
+                    unquote(event_module),
+                    unquote(action_type_arg) ++ unquote(param_mapping_arg) ++ [transforms: unquote(Macro.escape(command.transforms || [])), validations: unquote(Macro.escape(command.validations || []))]
+                  )
+                end
+              )
+            rescue
+              e in _ ->
+                {:error, Error.aggregate_error("Error executing command: #{Exception.message(e)}", 
+                  context: %{
+                    command: unquote(command.name), 
+                    command_module: unquote(command_module),
+                    error: inspect(e)
+                  }
+                )}
+            end
           end
           
           # Helper function to process a command after middleware has been applied
           defp process_command(aggregate, command, resource_module, action_name, identity_field, event_module, opts) do
             # For a new aggregate - nil id means it doesn't exist yet
-            if is_nil(Map.get(aggregate, identity_field)) do
-              # Implementation for new aggregates
-              # Use CommandActionMapper to map command to action
-              opts = opts ++ [identity_field: identity_field]
-              
-              # Convert action result to an event
-              case AshCommanded.Commanded.CommandActionMapper.map_to_action(
-                command, resource_module, action_name, opts
-              ) do
-                {:ok, _result} ->
-                  # Return the event with command fields
-                  {:ok, struct(event_module, Map.from_struct(command))}
+            command_id = Map.get(command, identity_field)
+            aggregate_id = Map.get(aggregate, identity_field)
+
+            cond do
+              # New aggregate (nil aggregate ID)
+              is_nil(aggregate_id) ->
+                # Implementation for new aggregates
+                # Use CommandActionMapper to map command to action
+                opts = opts ++ [identity_field: identity_field]
                 
-                {:error, reason} ->
-                  {:error, reason}
-              end
-            else
-              # For existing aggregate, check identity
-              if Map.get(aggregate, identity_field) == Map.get(command, identity_field) do
+                # Convert action result to an event
+                case AshCommanded.Commanded.CommandActionMapper.map_to_action(
+                  command, resource_module, action_name, opts
+                ) do
+                  {:ok, _result} ->
+                    # Return the event with command fields
+                    {:ok, struct(event_module, Map.from_struct(command))}
+                  
+                  {:error, reason} ->
+                    # Error is already standardized by CommandActionMapper
+                    {:error, reason}
+                end
+              
+              # Existing aggregate, check identity match
+              aggregate_id == command_id ->
                 # Implementation for existing aggregates
                 # Use CommandActionMapper to map command to action
                 opts = opts ++ [identity_field: identity_field]
@@ -309,12 +330,20 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
                     {:ok, struct(event_module, Map.from_struct(command))}
                   
                   {:error, reason} ->
+                    # Error is already standardized by CommandActionMapper
                     {:error, reason}
                 end
-              else
-                # Identity field mismatch
-                {:error, :invalid_identity}
-              end
+              
+              # Identity field mismatch
+              true ->
+                {:error, Error.aggregate_error("Invalid identity", 
+                  field: identity_field,
+                  value: command_id,
+                  context: %{
+                    aggregate_id: aggregate_id,
+                    command_id: command_id
+                  }
+                )}
             end
           end
         end
@@ -332,7 +361,7 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
           
           ## Returns
           
-          - `{:error, :not_implemented}` - Not implemented yet
+          - `{:error, error}` - Not implemented yet with standardized error
           """
           def execute(%__MODULE__{} = _aggregate, %unquote(command_module){} = command) do
             # Log that this command doesn't have a matching event
@@ -346,12 +375,31 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
               |> Module.concat()
             
             # Apply middleware even for not implemented commands
-            AshCommanded.Commanded.Middleware.CommandMiddlewareProcessor.apply_middleware(
-              command,
-              resource_module,
-              %{},
-              fn _cmd, _ctx -> {:error, :not_implemented} end
-            )
+            try do
+              AshCommanded.Commanded.Middleware.CommandMiddlewareProcessor.apply_middleware(
+                command,
+                resource_module,
+                %{},
+                fn _cmd, _ctx -> 
+                  {:error, Error.aggregate_error("Command not implemented", 
+                    context: %{
+                      command: unquote(command.name),
+                      command_module: unquote(command_module),
+                      message: "No matching event handler found for this command"
+                    }
+                  )} 
+                end
+              )
+            rescue
+              e in _ ->
+                {:error, Error.aggregate_error("Error executing command middleware: #{Exception.message(e)}", 
+                  context: %{
+                    command: unquote(command.name), 
+                    command_module: unquote(command_module),
+                    error: inspect(e)
+                  }
+                )}
+            end
           end
         end
       end
@@ -380,18 +428,27 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
         The updated aggregate state
         """
         def apply(%__MODULE__{} = state, %unquote(event_module){} = event) do
-          # Copy event fields to the aggregate state
-          changes = unquote(event_fields)
-            |> Enum.reduce(%{}, fn field, acc ->
-              if Map.has_key?(event, field) do
-                Map.put(acc, field, Map.get(event, field))
-              else
-                acc
-              end
-            end)
-          
-          # Apply changes to state
-          Map.merge(state, changes)
+          try do
+            # Copy event fields to the aggregate state
+            changes = unquote(event_fields)
+              |> Enum.reduce(%{}, fn field, acc ->
+                if Map.has_key?(event, field) do
+                  Map.put(acc, field, Map.get(event, field))
+                else
+                  acc
+                end
+              end)
+            
+            # Apply changes to state
+            Map.merge(state, changes)
+          rescue
+            e in _ ->
+              # In apply function, we need to return a state and can't report errors
+              # So we log the error and return the original state
+              require Logger
+              Logger.error("Error applying event #{unquote(event.name)}: #{Exception.message(e)}")
+              state
+          end
         end
       end
     end)
