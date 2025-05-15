@@ -86,7 +86,17 @@ defmodule AshCommanded.Commanded.Transformers.GenerateCommandedApplication do
     event_store = Keyword.get(config, :event_store)
     pubsub = Keyword.get(config, :pubsub)
     registry = Keyword.get(config, :registry)
-    snapshotting = Keyword.get(config, :snapshotting, [])
+    
+    # Extract snapshotting configuration
+    snapshotting_enabled = Keyword.get(config, :snapshotting, false)
+    snapshot_threshold = Keyword.get(config, :snapshot_threshold, 100)
+    snapshot_version = Keyword.get(config, :snapshot_version, 1)
+    snapshot_store = Keyword.get(config, :snapshot_store, nil)
+    
+    _snapshot_config = if snapshotting_enabled, do: [
+      threshold: snapshot_threshold,
+      snapshot_version: snapshot_version
+    ], else: []
 
     supervisor_child_specs = 
       if include_supervisor? do
@@ -122,15 +132,53 @@ defmodule AshCommanded.Commanded.Transformers.GenerateCommandedApplication do
     config_lines = config_lines ++ [{:pubsub, pubsub}]
     config_lines = config_lines ++ [{:registry, registry}]
     
+    # Add snapshotting configuration if enabled
     config_lines =
-      if snapshotting == [] do
-        config_lines
+      if snapshotting_enabled do
+        snapshot_opts = [
+          snapshot_every: snapshot_threshold,
+          snapshot_module: AshCommanded.Commanded.SnapshotAdapter
+        ]
+        config_lines ++ [{:snapshotting, snapshot_opts}]
       else
-        config_lines ++ [{:snapshotting, Macro.escape(snapshotting)}]
+        config_lines
       end
 
     config_lines = config_lines ++ [{:router, router_module}]
 
+    # Initialize snapshot store if snapshotting is enabled
+    snapshot_init = 
+      if snapshotting_enabled do
+        quote do
+          @doc """
+          Initializes the snapshot store when the application starts.
+          
+          This is called automatically by Commanded during application startup.
+          """
+          @impl true
+          def init do
+            # Initialize the default snapshot store or a custom one if provided
+            snapshot_store = unquote(snapshot_store) || AshCommanded.Commanded.SnapshotStore
+            
+            # Initialize the snapshot store with application configuration
+            case snapshot_store.init(%{
+              threshold: unquote(snapshot_threshold),
+              version: unquote(snapshot_version)
+            }) do
+              :ok -> :ok
+              {:error, reason} ->
+                require Logger
+                Logger.warning("Failed to initialize snapshot store: #{inspect(reason)}")
+                :ok
+            end
+            
+            :ok
+          end
+        end
+      else
+        quote do end
+      end
+      
     quote do
       defmodule unquote(app_module) do
         @moduledoc """
@@ -145,6 +193,8 @@ defmodule AshCommanded.Commanded.Transformers.GenerateCommandedApplication do
         ] ++ unquote(Macro.escape(config_lines))
 
         unquote(supervisor_child_specs)
+        
+        unquote(snapshot_init)
       end
     end
   end

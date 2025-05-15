@@ -53,9 +53,24 @@ defmodule AshCommanded.Commanded.Sections.ApplicationSection do
         default: :local
       ],
       snapshotting: [
-        type: :keyword_list,
-        doc: "Configuration for aggregate snapshotting",
-        default: []
+        type: :boolean,
+        doc: "Whether to enable aggregate snapshotting",
+        default: false
+      ],
+      snapshot_threshold: [
+        type: :integer,
+        doc: "Number of events to process before taking a snapshot",
+        default: 100
+      ],
+      snapshot_version: [
+        type: :integer,
+        doc: "The version of the snapshot schema",
+        default: 1
+      ],
+      snapshot_store: [
+        type: {:or, [:atom, :map]},
+        doc: "Optional custom snapshot store module or configuration",
+        default: nil
       ],
       include_supervisor?: [
         type: :boolean,

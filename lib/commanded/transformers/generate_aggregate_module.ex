@@ -125,7 +125,8 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
           commands,
           events,
           command_modules,
-          event_modules
+          event_modules,
+          dsl_state
         )
         
         # Skip actual module creation in test environment
@@ -166,7 +167,8 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
     commands,
     events,
     command_modules,
-    event_modules
+    event_modules,
+    dsl_state \\ nil
   ) do
     # Create a more descriptive moduledoc
     moduledoc = "Aggregate for #{resource_name} resource handling commands and events"
@@ -174,20 +176,43 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
     # Generate struct definition with all attribute fields
     struct_fields = attribute_names |> Enum.map(&{&1, nil})
     
+    # Add version field to struct if not already present - used for snapshotting
+    struct_fields = 
+      if Enum.any?(struct_fields, fn {name, _} -> name == :version end) do
+        struct_fields
+      else
+        struct_fields ++ [{:version, 0}]
+      end
+    
     # Generate execute function for each command
     execute_functions = generate_execute_functions(commands, events, command_modules, event_modules)
     
     # Generate apply function for each event
     apply_functions = generate_apply_functions(events, event_modules)
     
+    # Generate snapshot functions - passing application settings from DSL
+    app_config = 
+      if dsl_state do
+        app_sections = Transformer.get_entities(dsl_state, [:commanded, :application])
+        if app_sections && length(app_sections) > 0, do: hd(app_sections), else: nil
+      else
+        nil
+      end
+    snapshot_functions = generate_snapshot_functions(app_config)
+    
     quote do
       @moduledoc unquote(moduledoc)
       
       # Import the Error module for standardized error handling
       alias AshCommanded.Commanded.Error
+      alias AshCommanded.Commanded.Snapshot
+      alias AshCommanded.Commanded.SnapshotStore
       
       # Define the aggregate state struct with all resource attributes
       defstruct unquote(struct_fields)
+      
+      # Snapshot support 
+      unquote_splicing(snapshot_functions)
       
       # Command handlers
       unquote_splicing(execute_functions)
@@ -550,7 +575,17 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
               end)
             
             # Apply changes to state
-            Map.merge(state, changes)
+            updated_state = Map.merge(state, changes)
+            
+            # Increment version when applying events
+            updated_state = Map.update(updated_state, :version, 1, &(&1 + 1))
+            
+            # Check if we should take a snapshot and save it
+            if function_exported?(__MODULE__, :snapshot_state_if_needed, 1) do
+              snapshot_state_if_needed(updated_state)
+            else
+              updated_state
+            end
           rescue
             e in _ ->
               # In apply function, we need to return a state and can't report errors
@@ -562,5 +597,203 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
         end
       end
     end)
+  end
+  
+  # Generate snapshot-related functions for the aggregate
+  defp generate_snapshot_functions(app_config) do
+    # Extract snapshot configuration from application settings
+    snapshotting_enabled = app_config && Map.get(app_config, :snapshotting, false)
+    snapshot_threshold = app_config && Map.get(app_config, :snapshot_threshold, 100)
+    snapshot_version = app_config && Map.get(app_config, :snapshot_version, 1)
+    
+    # Default functions that work with or without snapshotting enabled
+    default_functions = quote do
+      @doc """
+      Returns the snapshot version for this aggregate.
+      
+      ## Returns
+      
+      The snapshot version number
+      
+      ## Examples
+      
+          iex> MyApp.UserAggregate.snapshot_version()
+          1
+      """
+      @spec snapshot_version() :: integer()
+      def snapshot_version, do: unquote(snapshot_version)
+      
+      @doc """
+      Returns the snapshot threshold for this aggregate.
+      This is the number of events to process before taking a snapshot.
+      
+      ## Returns
+      
+      The snapshot threshold
+      
+      ## Examples
+      
+          iex> MyApp.UserAggregate.snapshot_threshold()
+          100
+      """
+      @spec snapshot_threshold() :: integer()
+      def snapshot_threshold, do: unquote(snapshot_threshold)
+      
+      @doc """
+      Checks if a snapshot should be taken based on the aggregate's version.
+      
+      ## Parameters
+      
+      - `state` - The current state of the aggregate
+      
+      ## Returns
+      
+      `true` if a snapshot should be taken, `false` otherwise
+      
+      ## Examples
+      
+          iex> state = %MyApp.UserAggregate{version: 105}
+          iex> MyApp.UserAggregate.should_snapshot?(state)
+          true
+          
+          iex> state = %MyApp.UserAggregate{version: 42}
+          iex> MyApp.UserAggregate.should_snapshot?(state)
+          false
+      """
+      @spec should_snapshot?(%__MODULE__{}) :: boolean()
+      def should_snapshot?(%__MODULE__{} = state) do
+        # Only trigger a snapshot if snapshotting is enabled and
+        # the version is a multiple of the threshold
+        unquote(snapshotting_enabled) &&
+          state.version > 0 &&
+          rem(state.version, snapshot_threshold()) == 0
+      end
+    end
+    
+    # Functions that are only generated if snapshotting is enabled
+    if snapshotting_enabled do
+      snapshot_functions = quote do
+        @doc """
+        Creates a snapshot of the current aggregate state.
+        
+        ## Parameters
+        
+        - `state` - The current state of the aggregate
+        
+        ## Returns
+        
+        A new snapshot structure
+        
+        ## Examples
+        
+            iex> state = %MyApp.UserAggregate{id: "123", name: "John", version: 100}
+            iex> MyApp.UserAggregate.create_snapshot(state)
+            %AshCommanded.Commanded.Snapshot{
+              source_uuid: "123",
+              source_type: MyApp.UserAggregate,
+              source_version: 1,
+              state: state,
+              version: 100,
+              created_at: ~U[2023-01-01 00:00:00Z]
+            }
+        """
+        @spec create_snapshot(%__MODULE__{}) :: Snapshot.t()
+        def create_snapshot(%__MODULE__{} = state) do
+          Snapshot.new(state, __MODULE__, state.version, snapshot_version())
+        end
+        
+        @doc """
+        Takes a snapshot of the aggregate if necessary (based on threshold) and saves it.
+        
+        ## Parameters
+        
+        - `state` - The current state of the aggregate
+        
+        ## Returns
+        
+        The original state (unchanged)
+        
+        ## Examples
+        
+            iex> state = %MyApp.UserAggregate{id: "123", name: "John", version: 100}
+            iex> MyApp.UserAggregate.snapshot_state_if_needed(state)
+            state
+        """
+        @spec snapshot_state_if_needed(%__MODULE__{}) :: %__MODULE__{}
+        def snapshot_state_if_needed(%__MODULE__{} = state) do
+          if should_snapshot?(state) do
+            snapshot = create_snapshot(state)
+            # Save snapshot asynchronously to avoid slowing down command processing
+            Task.start(fn -> SnapshotStore.save_snapshot(snapshot) end)
+          end
+          
+          state
+        end
+        
+        @doc """
+        Gets the latest snapshot for an aggregate.
+        
+        ## Parameters
+        
+        - `aggregate_id` - The unique identifier of the aggregate
+        
+        ## Returns
+        
+        - `{:ok, snapshot}` - If a snapshot was found
+        - `:error` - If no snapshot was found
+        
+        ## Examples
+        
+            iex> MyApp.UserAggregate.get_snapshot("user-123")
+            {:ok, %AshCommanded.Commanded.Snapshot{...}}
+            
+            iex> MyApp.UserAggregate.get_snapshot("nonexistent-id")
+            :error
+        """
+        @spec get_snapshot(String.t()) :: {:ok, Snapshot.t()} | :error
+        def get_snapshot(aggregate_id) do
+          SnapshotStore.get_snapshot(aggregate_id, __MODULE__)
+        end
+        
+        @doc """
+        Restores an aggregate from a snapshot.
+        
+        ## Parameters
+        
+        - `snapshot` - The snapshot to restore from
+        
+        ## Returns
+        
+        The restored aggregate state
+        
+        ## Examples
+        
+            iex> snapshot = %AshCommanded.Commanded.Snapshot{state: %{id: "123", name: "John", version: 42}}
+            iex> MyApp.UserAggregate.restore_from_snapshot(snapshot)
+            %MyApp.UserAggregate{id: "123", name: "John", version: 42}
+        """
+        @spec restore_from_snapshot(Snapshot.t()) :: %__MODULE__{}
+        def restore_from_snapshot(%Snapshot{} = snapshot) do
+          snapshot
+          |> Snapshot.state()
+          |> ensure_struct()
+        end
+        
+        # Ensure the restored state is a proper struct of this module
+        defp ensure_struct(state) do
+          if is_struct(state, __MODULE__) do
+            state
+          else
+            struct(__MODULE__, Map.from_struct(state))
+          end
+        end
+      end
+      
+      # Combine default and snapshot-specific functions
+      [default_functions, snapshot_functions]
+    else
+      # If snapshotting is disabled, only return default functions
+      [default_functions]
+    end
   end
 end

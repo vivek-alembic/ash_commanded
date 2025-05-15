@@ -298,18 +298,23 @@ defmodule AshCommanded.Commanded.Transformers.GenerateMainRouterModule do
       # Helper function for dispatching commands
       helper_function = quote do
         @doc """
-        Helper function to dispatch any command.
+        Helper function to dispatch any command with snapshot support.
         
         ## Parameters
         
         - `command` - The command to dispatch
+        - `opts` - Additional options to pass to the dispatcher
         
         ## Returns
         
         The result of dispatching the command
         """
-        def dispatch_command(command) do
-          __MODULE__.dispatch(command)
+        def dispatch_command(command, opts \\ []) do
+          # Add snapshot adapter options to command dispatch
+          snapshot_opts = AshCommanded.Commanded.SnapshotConfiguration.dispatch_options()
+          dispatch_opts = Keyword.merge(snapshot_opts, opts)
+          
+          __MODULE__.dispatch(command, dispatch_opts)
         end
       end
       
@@ -348,7 +353,7 @@ defmodule AshCommanded.Commanded.Transformers.GenerateMainRouterModule do
           {:ok, command}
         end
         
-        def dispatch_command(command) do
+        def dispatch_command(command, _opts \\ []) do
           dispatch(command)
         end
       end
