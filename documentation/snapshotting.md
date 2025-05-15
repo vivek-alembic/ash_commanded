@@ -1,6 +1,6 @@
 # Aggregate Snapshotting
 
-AshCommanded supports aggregate snapshotting as a performance optimization for aggregates with many events. Snapshotting allows the system to store the current state of an aggregate at specific points and then only replay events that occurred after the snapshot was taken.
+AshCommanded supports [aggregate snapshotting](https://hexdocs.pm/commanded/aggregate-snapshotting.html) as a performance optimization for aggregates with many events. Snapshotting allows the system to store the current state of an aggregate at specific points and then only replay events that occurred after the snapshot was taken. This implementation follows the [Commanded snapshotting architecture](https://hexdocs.pm/commanded/aggregate-snapshotting.html).
 
 ## Why Use Snapshotting?
 
@@ -49,7 +49,7 @@ end
 
 ## How Snapshotting Works
 
-When snapshotting is enabled, the following happens:
+When snapshotting is enabled, the following happens (following Commanded's [snapshot loading process](https://hexdocs.pm/commanded/aggregate-snapshotting.html#how-it-works)):
 
 1. **Command Execution**: When a command is sent to an aggregate, the system first checks if a snapshot exists for that aggregate.
 
@@ -61,13 +61,13 @@ When snapshotting is enabled, the following happens:
 
 ## Snapshot Storage
 
-By default, snapshots are stored in memory using an ETS table. This is suitable for development but not for production. 
+By default, snapshots are stored in memory using an ETS table, similar to Commanded's [in-memory snapshot store](https://hexdocs.pm/commanded/aggregate-snapshotting.html#snapshot-storage). This is suitable for development but not for production. 
 
-In a production environment, you should implement a custom snapshot store that persists snapshots to a database or other storage system.
+In a production environment, you should implement a custom snapshot store that persists snapshots to a database or other storage system, following Commanded's [snapshot adapter pattern](https://hexdocs.pm/commanded/aggregate-snapshotting.html#custom-snapshot-storage).
 
 ### Custom Snapshot Store
 
-You can implement a custom snapshot store by creating a module that implements the `AshCommanded.Commanded.SnapshotStore` behaviour:
+You can implement a custom snapshot store by creating a module that implements the `AshCommanded.Commanded.SnapshotStore` behaviour, which is based on Commanded's [Snapshot adapter](https://hexdocs.pm/commanded/Commanded.Snapshotting.Adapter.html) interface:
 
 ```elixir
 defmodule MyApp.CustomSnapshotStore do

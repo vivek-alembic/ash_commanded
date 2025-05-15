@@ -1,6 +1,6 @@
 # Command Middleware
 
-AshCommanded provides a middleware system that allows you to intercept and modify commands before they are dispatched, as well as process the results afterward. This is useful for implementing cross-cutting concerns such as:
+AshCommanded provides a middleware system that allows you to intercept and modify commands before they are dispatched, as well as process the results afterward. This concept is similar to [Commanded's middleware](https://hexdocs.pm/commanded/commands.html#command-handlers) functionality but adapted for the Ash framework context. This is useful for implementing cross-cutting concerns such as:
 
 - Validation
 - Logging
@@ -109,7 +109,7 @@ Configuration options:
 
 ## Creating Custom Middleware
 
-You can create your own middleware by implementing the `AshCommanded.Commanded.Middleware.CommandMiddleware` behaviour or by using `AshCommanded.Commanded.Middleware.BaseMiddleware` as a starting point:
+You can create your own middleware by implementing the `AshCommanded.Commanded.Middleware.CommandMiddleware` behaviour or by using `AshCommanded.Commanded.Middleware.BaseMiddleware` as a starting point. This is conceptually similar to how you would [implement middleware in Commanded](https://hexdocs.pm/commanded/middleware.html):
 
 ```elixir
 defmodule MyApp.AuthorizationMiddleware do

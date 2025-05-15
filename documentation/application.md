@@ -1,6 +1,6 @@
 # Commanded Application Configuration
 
-The `application` section allows you to configure the Commanded application that manages command dispatch, event publishing, and process management for your domain.
+The `application` section allows you to configure the [Commanded application](https://hexdocs.pm/commanded/application.html) that manages command dispatch, event publishing, and process management for your domain. The Commanded application is the core component that orchestrates the event-sourced domain.
 
 ## Basic Usage
 
@@ -41,10 +41,10 @@ The following options can be configured in the `application` section:
 
 ## Events Stores
 
-AshCommanded supports all Commanded event store adapters:
+AshCommanded supports all [Commanded event store adapters](https://hexdocs.pm/commanded/event-store.html):
 
-* `Commanded.EventStore.Adapters.EventStore` - The default PostgreSQL event store.
-* `Commanded.EventStore.Adapters.InMemory` - An in-memory event store useful for testing.
+* [`Commanded.EventStore.Adapters.EventStore`](https://hexdocs.pm/commanded_eventstore_adapter/) - The default PostgreSQL event store.
+* [`Commanded.EventStore.Adapters.InMemory`](https://hexdocs.pm/commanded/Commanded.EventStore.Adapters.InMemory.html) - An in-memory event store useful for testing.
 
 Example using the default EventStore adapter:
 
@@ -70,7 +70,7 @@ end
 
 ## Generated Application Module
 
-The DSL will generate an application module using the configuration:
+The DSL will generate an application module using the configuration. This module extends the [Commanded.Application](https://hexdocs.pm/commanded/Commanded.Application.html) behavior:
 
 ```elixir
 defmodule ECommerce.Store.Application do

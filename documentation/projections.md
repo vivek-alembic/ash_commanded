@@ -1,6 +1,6 @@
 # Projections
 
-Projections in AshCommanded define how events affect the state of your resources. They are the read model update mechanism in the CQRS pattern.
+Projections in AshCommanded define how events affect the state of your resources. They are the read model update mechanism in the [CQRS pattern](https://martinfowler.com/bliki/CQRS.html). In Commanded, [projections](https://hexdocs.pm/commanded/read-model-projections.html) transform domain events into a read-optimized format.
 
 ## Defining Projections
 
@@ -56,7 +56,7 @@ Each projection can have the following options:
 
 ## Generated Projector Modules
 
-AshCommanded generates a projector module for each resource with projections. This projector is a Commanded event handler that subscribes to events and updates the read model.
+AshCommanded generates a projector module for each resource with projections. This projector is a [Commanded event handler](https://hexdocs.pm/commanded/Commanded.Event.Handler.html) that subscribes to events and updates the read model. It leverages [Commanded's projection support](https://hexdocs.pm/commanded/read-model-projections.html) to handle the events efficiently.
 
 ```elixir
 defmodule ECommerce.Projectors.CustomerProjector do
@@ -66,6 +66,7 @@ defmodule ECommerce.Projectors.CustomerProjector do
 
   use Commanded.Projections.Ecto, 
     name: "ECommerce.Projectors.CustomerProjector"
+  # See Commanded's Ecto projections: https://hexdocs.pm/commanded_ecto_projections/
 
   # Each projection gets a project/3 function
   project(%ECommerce.Events.CustomerRegistered{} = event, _metadata, fn _context ->

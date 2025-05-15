@@ -1,6 +1,6 @@
 # Commands
 
-Commands in AshCommanded represent intentions to change the state of your application. They are the input side of the CQRS pattern.
+Commands in AshCommanded represent intentions to change the state of your application. They are the input side of the [CQRS pattern](https://martinfowler.com/bliki/CQRS.html). In Commanded, [commands](https://hexdocs.pm/commanded/commands.html) are the primary way to make changes to your domain.
 
 ## Defining Commands
 
@@ -88,7 +88,7 @@ end
 
 ## Command Handlers
 
-AshCommanded automatically generates command handlers that invoke the corresponding Ash actions:
+AshCommanded automatically generates [command handlers](https://hexdocs.pm/commanded/Commanded.Commands.Handler.html) that invoke the corresponding Ash actions:
 
 ```elixir
 defmodule AshCommanded.Commanded.CommandHandlers.CustomerHandler do
@@ -103,3 +103,5 @@ defmodule AshCommanded.Commanded.CommandHandlers.CustomerHandler do
   end
 end
 ```
+
+Command handlers in Commanded are responsible for validating, authorizing, and processing commands. See the [Commanded documentation on command handlers](https://hexdocs.pm/commanded/commands.html#handling-commands) for more details.

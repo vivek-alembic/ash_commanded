@@ -1,7 +1,7 @@
 
 ## Overview
 
-AshCommanded is an Elixir library that provides Command Query Responsibility Segregation (CQRS) and Event-Sourcing (ES) patterns for the Ash Framework. It extends Ash resources with a Commanded DSL that enables defining commands, events, and projections. The extension relies on the excellent [Commanded](https://hexdocs.pm/commanded/Commanded.html) library. The Commanded Guides section explained the different concepts better than I could.
+AshCommanded is an Elixir library that provides [Command Query Responsibility Segregation (CQRS)](https://martinfowler.com/bliki/CQRS.html) and [Event-Sourcing (ES)](https://martinfowler.com/eaaDev/EventSourcing.html) patterns for the [Ash Framework](https://hexdocs.pm/ash/). It extends Ash resources with a Commanded DSL that enables defining commands, events, and projections. The extension relies on the excellent [Commanded](https://hexdocs.pm/commanded/Commanded.html) library. The [Commanded Guides](https://hexdocs.pm/commanded/commands.html) section explains the different concepts better than I could.
 
 Special thanks to [Ben Smith](https://github.com/slashdotdash) for the Commanded library and to [Barnabas J.] for letting me steal the library name.
 
@@ -29,14 +29,14 @@ mix test --cover:
 
 ## Architecture
 
-AshCommanded is built as a DSL extension for Ash Framework resources. Its main components are:
+AshCommanded is built as a DSL extension for [Ash Framework](https://hexdocs.pm/ash/) resources using the [Spark DSL](https://hexdocs.pm/spark/) library for its extensible DSL capabilities. Its main components are:
 
-1. **DSL Extension**: The `AshCommanded.Commanded.Dsl` module defines five main sections:
-   - `commands`: Define commands that trigger state changes
-   - `events`: Define events that are emitted by commands
-   - `projections`: Define how events affect the resource state
-   - `event_handlers`: Define general purpose handlers for events
-   - `application`: Configure Commanded application settings
+1. **DSL Extension**: The [`AshCommanded.Commanded.Dsl`](lib/commanded/dsl.ex) module defines five main sections:
+   - [`commands`](lib/commanded/sections/commands_section.ex): Define commands that trigger state changes
+   - [`events`](lib/commanded/sections/events_section.ex): Define events that are emitted by commands
+   - [`projections`](lib/commanded/sections/projections_section.ex): Define how events affect the resource state
+   - [`event_handlers`](lib/commanded/sections/event_handlers_section.ex): Define general purpose handlers for events
+   - [`application`](lib/commanded/sections/application_section.ex): Configure Commanded application settings
 
 2. **Code Generation**: The library dynamically generates Elixir modules:
    - Command modules (structs with typespecs)
@@ -49,15 +49,15 @@ AshCommanded is built as a DSL extension for Ash Framework resources. Its main c
    - Commanded application modules (with projector and handler supervision)
 
 3. **Transformers**: The DSL uses transformers to generate code:
-   - `GenerateCommandModules`: Generates command structs
-   - `GenerateEventModules`: Generates event structs
-   - `GenerateProjectionModules`: Generates projection modules
-   - `GenerateProjectorModules`: Generates Commanded event handlers that process events
-   - `GenerateEventHandlerModules`: Generates general purpose event handlers
-   - `GenerateAggregateModule`: Generates aggregate module for Commanded
-   - `GenerateDomainRouterModule`: Generates router module for each domain
-   - `GenerateMainRouterModule`: Generates main application router
-   - `GenerateCommandedApplication`: Generates Commanded application with projector and handler supervision
+   - [`GenerateCommandModules`](lib/commanded/transformers/generate_command_modules.ex): Generates command structs
+   - [`GenerateEventModules`](lib/commanded/transformers/generate_event_modules.ex): Generates event structs
+   - [`GenerateProjectionModules`](lib/commanded/transformers/generate_projection_modules.ex): Generates projection modules
+   - [`GenerateProjectorModules`](lib/commanded/transformers/generate_projector_modules.ex): Generates Commanded event handlers that process events
+   - [`GenerateEventHandlerModules`](lib/commanded/transformers/generate_event_handler_modules.ex): Generates general purpose event handlers
+   - [`GenerateAggregateModule`](lib/commanded/transformers/generate_aggregate_module.ex): Generates aggregate module for Commanded
+   - [`GenerateDomainRouterModule`](lib/commanded/transformers/generate_domain_router_module.ex): Generates router module for each domain
+   - [`GenerateMainRouterModule`](lib/commanded/transformers/generate_main_router_module.ex): Generates main application router
+   - [`GenerateCommandedApplication`](lib/commanded/transformers/generate_commanded_application.ex): Generates Commanded application with projector and handler supervision
 
 4. **Advanced Features**:
    - **Command Middleware**: Process commands through a pipeline of middleware functions
@@ -96,12 +96,12 @@ defmodule ECommerce.Customer do
 
     create :register do
       accept [:name, :email]
-      change set_attribute(:status, :pending)
+      change {Ash.Changeset, :set_attribute, [:status, :pending]}
     end
 
     update :confirm_email do
       accept []
-      change set_attribute(:status, :active)
+      change {Ash.Changeset, :set_attribute, [:status, :active]}
     end
   end
 
@@ -197,11 +197,18 @@ The documentation includes:
 - Cheatsheets for the DSL
 
 Additional documentation files:
+- [Commands](documentation/commands.md)
+- [Events](documentation/events.md)
+- [Projections](documentation/projections.md)
+- [Event Handlers](documentation/event_handlers.md)
 - [Middleware](documentation/middleware.md)
 - [Parameter Handling](documentation/parameter_handling.md)
 - [Transactions](documentation/transactions.md)
 - [Context Propagation](documentation/context_propagation.md)
 - [Error Handling](documentation/error_handling.md)
+- [Application](documentation/application.md)
+- [Routers](documentation/routers.md)
+- [Snapshotting](documentation/snapshotting.md)
 
 ## Commands
 
@@ -595,6 +602,6 @@ This generates a Commanded application module that:
 
 ## Where are the Process Managers?
 
-Process Managers in the Commanded are responsible for coordinating one or more aggregates. It handles events and dispatches commands in response. This is very business logic specific and would be rather difficult to generate appropriately. It is suggested to write your Process Managers using [Reactor](https://hexdocs.pm/reactor/readme.html) instead.
+Process Managers in Commanded are responsible for coordinating one or more aggregates. They handle events and dispatch commands in response. This is very business logic specific and would be rather difficult to generate appropriately. It is suggested to write your Process Managers using [Reactor](https://hexdocs.pm/reactor/readme.html) instead, which is a library specifically designed for workflow orchestration in Elixir and works well with Commanded's event-driven architecture.
 
 

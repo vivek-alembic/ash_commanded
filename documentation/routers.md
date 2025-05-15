@@ -59,11 +59,16 @@ end
 
 ## Command Dispatching
 
-With these routers in place, you can dispatch commands using:
+With these routers in place, you can dispatch commands using the [dispatch/1](https://hexdocs.pm/commanded/Commanded.Commands.Router.html#dispatch/1) or [dispatch/2](https://hexdocs.pm/commanded/Commanded.Commands.Router.html#dispatch/2) functions:
 
 ```elixir
+# Basic command dispatch
 command = %ECommerce.Commands.CreateProduct{id: "123", name: "Premium Widget", price: 29.99}
 AshCommanded.Router.dispatch(command)
+
+# With options
+command = %ECommerce.Commands.CreateProduct{id: "123", name: "Premium Widget", price: 29.99}
+AshCommanded.Router.dispatch(command, correlation_id: UUID.uuid4(), metadata: %{user_id: "user-123"})
 ```
 
 The command will be routed to the appropriate aggregate and handler based on the command type and the resource's identity.

@@ -1,10 +1,10 @@
 # Event Handlers
 
-Event handlers define how to respond to domain events with side effects, integrations, notifications, or other operations that don't necessarily update the resource state directly. Unlike projections which are focused on updating read models, event handlers allow you to execute arbitrary code in response to events.
+Event handlers define how to respond to domain events with side effects, integrations, notifications, or other operations that don't necessarily update the resource state directly. Unlike projections which are focused on updating read models, event handlers allow you to execute arbitrary code in response to events. In Commanded, [event handlers](https://hexdocs.pm/commanded/Commanded.Event.Handler.html) provide a flexible way to react to domain events.
 
 ## Introduction
 
-In CQRS and Event Sourcing systems, events represent facts that have occurred in your domain. While projections use these events to maintain read models, there are often other operations you want to perform when events occur:
+In [CQRS](https://martinfowler.com/bliki/CQRS.html) and [Event Sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) systems, events represent facts that have occurred in your domain. While projections use these events to maintain read models, there are often other operations you want to perform when events occur. This follows Commanded's [event handling approach](https://hexdocs.pm/commanded/events.html#handling-events):
 
 - Sending notifications (emails, SMS, push notifications)
 - Integrating with external systems
@@ -153,7 +153,7 @@ It's important to understand the distinction between projections and event handl
 
 ## Generated Modules
 
-AshCommanded automatically generates event handler modules based on your DSL configuration:
+AshCommanded automatically generates event handler modules based on your DSL configuration. These follow the [Commanded.Event.Handler](https://hexdocs.pm/commanded/Commanded.Event.Handler.html) pattern:
 
 ```elixir
 defmodule MyApp.EventHandlers.OrderOrderConfirmationHandler do

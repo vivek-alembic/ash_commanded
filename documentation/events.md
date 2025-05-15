@@ -1,6 +1,6 @@
 # Events
 
-Events in AshCommanded represent facts that have occurred in your system. They are the source of truth for the state of your aggregates in the event sourcing pattern.
+Events in AshCommanded represent facts that have occurred in your system. They are the source of truth for the state of your aggregates in the [event sourcing pattern](https://martinfowler.com/eaaDev/EventSourcing.html). In Commanded, [events](https://hexdocs.pm/commanded/events.html) are immutable facts that describe something that has happened in your domain.
 
 ## Defining Events
 
@@ -65,7 +65,7 @@ Events are handled in several ways in AshCommanded:
 
 ### Aggregate State Updates
 
-In the aggregate module, AshCommanded generates `apply/2` functions for each event to update the aggregate state:
+In the [aggregate module](https://hexdocs.pm/commanded/aggregates.html), AshCommanded generates `apply/2` functions for each event to update the aggregate state. This follows the Commanded pattern for [event-sourced aggregates](https://hexdocs.pm/commanded/aggregates.html#event-sourced-aggregates):
 
 ```elixir
 defmodule ECommerce.CustomerAggregate do
@@ -91,11 +91,11 @@ end
 
 ### Projections
 
-Projections transform events into resource updates, allowing you to maintain read models. See the [Projections](projections.md) documentation for details.
+Projections transform events into resource updates, allowing you to maintain read models. This aligns with the Commanded concept of [read model projections](https://hexdocs.pm/commanded/read-model-projections.html). See the [Projections](projections.md) documentation for details.
 
 ### Event Handlers
 
-Event handlers allow you to respond to events with side effects like sending notifications or integrating with external systems. See the [Event Handlers](event_handlers.md) documentation for more information.
+Event handlers allow you to respond to events with side effects like sending notifications or integrating with external systems. These are implemented as [Commanded event handlers](https://hexdocs.pm/commanded/Commanded.Event.Handler.html). See the [Event Handlers](event_handlers.md) documentation for more information.
 
 ## Choosing Between Projections and Event Handlers
 
