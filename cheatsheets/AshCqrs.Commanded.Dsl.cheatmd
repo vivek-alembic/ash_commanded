@@ -58,6 +58,62 @@ defmodule ECommerce.Customer do
             required: [:customer_id, :items, :payment_method]}
         ]
       end
+      
+      # Command with parameter transformation
+      command :process_payment do
+        fields [:id, :amount, :currency, :payment_method]
+        
+        transform_params do
+          # Map fields
+          map :payment_method, :method_type
+          
+          # Cast fields to specific types
+          cast :amount, :decimal
+          
+          # Add computed fields
+          compute :processed_at, fn _ -> DateTime.utc_now() end
+          
+          # Transform individual fields
+          transform :currency, &String.upcase/1
+          
+          # Set default values
+          default :status, "pending"
+          
+          # Custom transformation
+          custom fn params ->
+            Map.put(params, :payment_id, "PMT-#{params.id}")
+          end
+        end
+      end
+      
+      # Command with parameter validation
+      command :ship_order do
+        fields [:id, :tracking_number, :carrier, :shipping_date]
+        
+        validate_params do
+          # Type validation
+          validate :id, type: :string
+          validate :tracking_number, type: :string
+          
+          # Format validation
+          validate :tracking_number, format: ~r/^[A-Z]{2}\d{9}[A-Z]{2}$/
+          
+          # Range validation
+          validate :shipping_date, fn date ->
+            today = Date.utc_today()
+            if Date.compare(date, today) in [:eq, :gt] do
+              :ok
+            else
+              {:error, "Shipping date cannot be in the past"}
+            end
+          end
+          
+          # Multiple validations on one field
+          validate :carrier do
+            one_of ["USPS", "FedEx", "UPS", "DHL"]
+          end
+        end
+      end
     end
   end
 end
@@ -287,6 +343,68 @@ defmodule ECommerce.AuthorizationMiddleware do
     else
       # Not authorized - stop the chain
       {:error, :unauthorized}
+    end
+  end
+end
+```
+
+## Error Handling
+
+```elixir
+# Define custom error handling in middleware
+defmodule ECommerce.ErrorHandlingMiddleware do
+  use AshCommanded.Commanded.Middleware.BaseMiddleware
+  alias AshCommanded.Commanded.Error
+  
+  @impl true
+  def after_dispatch({:error, reason}, _command, context) do
+    # Normalize the error to the standard format
+    standard_error = Error.normalize_error(reason)
+    
+    # Log the error with context
+    require Logger
+    Logger.error("Command failed: #{Error.format(standard_error)}, context: #{inspect(context)}")
+    
+    # Return the standardized error
+    {:error, standard_error}
+  end
+  
+  def after_dispatch(result, _command, _context) do
+    # Pass through successful results or already standardized errors
+    result
+  end
+end
+
+# Using the error module directly
+defmodule ECommerce.OrderService do
+  alias AshCommanded.Commanded.Error
+  
+  def place_order(order_params) do
+    with {:ok, command} <- build_command(order_params),
+         {:ok, result} <- dispatch_command(command) do
+      {:ok, result}
+    else
+      {:error, reason} ->
+        # Convert to standard error format
+        standard_error = Error.normalize_error(reason)
+        {:error, standard_error}
+    end
+  end
+  
+  def validate_order(order) do
+    cond do
+      is_nil(order.customer_id) ->
+        {:error, Error.validation_error("Customer ID is required", field: :customer_id)}
+        
+      length(order.items) == 0 ->
+        {:error, Error.validation_error("Order must contain at least one item", field: :items)}
+        
+      order.total_amount <= 0 ->
+        {:error, Error.validation_error("Total amount must be positive", 
+          field: :total_amount, value: order.total_amount)}
+          
+      true ->
+        :ok
     end
   end
 end
