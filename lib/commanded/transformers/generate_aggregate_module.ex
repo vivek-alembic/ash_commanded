@@ -239,51 +239,74 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
           - `{:error, reason}` - When command execution fails
           """
           def execute(%__MODULE__{} = aggregate, %unquote(command_module){} = command) do
+            # Extract resource module from command
+            resource_module = command.__struct__
+              |> Module.split()
+              |> Enum.drop(-2)  # Remove "Commands" and command name
+              |> Module.concat()
+            
+            # Set up command context
+            context = %{
+              aggregate: aggregate,
+              identity_field: unquote(identity_field),
+              action_name: unquote(action_name),
+              action_type: unquote(command.action_type), 
+              param_mapping: unquote(command.param_mapping)
+            }
+            
+            # Apply middleware and execute command
+            AshCommanded.Commanded.Middleware.CommandMiddlewareProcessor.apply_middleware(
+              command,
+              resource_module,
+              context,
+              fn cmd, ctx ->
+                # This is the final handler that runs after all middleware
+                process_command(
+                  ctx.aggregate, 
+                  cmd, 
+                  resource_module, 
+                  ctx.action_name, 
+                  ctx.identity_field,
+                  unquote(event_module),
+                  unquote(action_type_arg) ++ unquote(param_mapping_arg)
+                )
+              end
+            )
+          end
+          
+          # Helper function to process a command after middleware has been applied
+          defp process_command(aggregate, command, resource_module, action_name, identity_field, event_module, opts) do
             # For a new aggregate - nil id means it doesn't exist yet
-            if is_nil(aggregate.unquote(identity_field)) do
+            if is_nil(Map.get(aggregate, identity_field)) do
               # Implementation for new aggregates
-              resource_module = command.__struct__
-                |> Module.split()
-                |> Enum.drop(-2)  # Remove "Commands" and command name
-                |> Module.concat()
-              
               # Use CommandActionMapper to map command to action
-              opts = unquote(action_type_arg) ++ 
-                     unquote(param_mapping_arg) ++ 
-                     [identity_field: unquote(identity_field)]
+              opts = opts ++ [identity_field: identity_field]
               
               # Convert action result to an event
               case AshCommanded.Commanded.CommandActionMapper.map_to_action(
-                command, resource_module, unquote(action_name), opts
+                command, resource_module, action_name, opts
               ) do
                 {:ok, _result} ->
                   # Return the event with command fields
-                  {:ok, struct(unquote(event_module), Map.from_struct(command))}
+                  {:ok, struct(event_module, Map.from_struct(command))}
                 
                 {:error, reason} ->
                   {:error, reason}
               end
             else
               # For existing aggregate, check identity
-              if aggregate.unquote(identity_field) == command.unquote(identity_field) do
+              if Map.get(aggregate, identity_field) == Map.get(command, identity_field) do
                 # Implementation for existing aggregates
-                resource_module = command.__struct__
-                  |> Module.split()
-                  |> Enum.drop(-2)  # Remove "Commands" and command name
-                  |> Module.concat()
-                
                 # Use CommandActionMapper to map command to action
-                opts = unquote(action_type_arg) ++ 
-                       unquote(param_mapping_arg) ++ 
-                       [identity_field: unquote(identity_field)]
+                opts = opts ++ [identity_field: identity_field]
                 
                 # Convert action result to an event
                 case AshCommanded.Commanded.CommandActionMapper.map_to_action(
-                  command, resource_module, unquote(action_name), opts
+                  command, resource_module, action_name, opts
                 ) do
                   {:ok, _result} ->
                     # Return the event with command fields
-                    {:ok, struct(unquote(event_module), Map.from_struct(command))}
+                    {:ok, struct(event_module, Map.from_struct(command))}
                   
                   {:error, reason} ->
                     {:error, reason}
@@ -311,12 +334,24 @@ defmodule AshCommanded.Commanded.Transformers.GenerateAggregateModule do
           
           - `{:error, :not_implemented}` - Not implemented yet
           """
-          def execute(%__MODULE__{} = _aggregate, %unquote(command_module){} = _command) do
+          def execute(%__MODULE__{} = _aggregate, %unquote(command_module){} = command) do
             # Log that this command doesn't have a matching event
             require Logger
             Logger.warning("No matching event found for command #{unquote(inspect(command.name))}")
             
-            {:error, :not_implemented}
+            # Extract resource module from command
+            resource_module = command.__struct__
+              |> Module.split()
+              |> Enum.drop(-2)  # Remove "Commands" and command name
+              |> Module.concat()
+            
+            # Apply middleware even for not implemented commands
+            AshCommanded.Commanded.Middleware.CommandMiddlewareProcessor.apply_middleware(
+              command,
+              resource_module,
+              %{},
+              fn _cmd, _ctx -> {:error, :not_implemented} end
+            )
           end
         end
       end

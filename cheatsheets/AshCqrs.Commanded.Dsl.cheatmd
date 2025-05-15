@@ -35,6 +35,29 @@ defmodule ECommerce.Customer do
         handler_name :handle_password_change
         autogenerate_handler? false
       end
+      
+      # Command with action mapping options
+      command :update_profile do
+        fields [:id, :name, :bio, :avatar_url]
+        action :update_profile_details
+        action_type :update
+        param_mapping %{
+          name: :full_name,
+          bio: :biography,
+          avatar_url: :profile_image
+        }
+      end
+      
+      # Command with middleware
+      command :place_order do
+        fields [:id, :customer_id, :items, :payment_method]
+        
+        middleware [
+          AshCommanded.Commanded.Middleware.LoggingMiddleware,
+          {AshCommanded.Commanded.Middleware.ValidationMiddleware,
+            required: [:customer_id, :items, :payment_method]}
+        ]
+      end
     end
   end
 end
@@ -180,6 +203,95 @@ defmodule ECommerce.Order do
 end
 ```
 
+## Middleware
+
+```elixir
+defmodule ECommerce.Order do
+  use Ash.Resource,
+    extensions: [AshCommanded.Commanded.Dsl]
+
+  commanded do
+    commands do
+      # Command with validation middleware
+      command :place_order do
+        fields [:id, :customer_id, :items, :payment_method, :shipping_address]
+        
+        middleware [
+          # Simple middleware with no options
+          AshCommanded.Commanded.Middleware.LoggingMiddleware,
+          
+          # Middleware with validation options
+          {AshCommanded.Commanded.Middleware.ValidationMiddleware,
+            # Required fields validation
+            required: [:customer_id, :items, :payment_method],
+            
+            # Format validation
+            format: [
+              customer_id: ~r/^cust_\w{8}$/,
+              payment_method: ~r/^(credit_card|paypal|bitcoin)$/
+            ],
+            
+            # Custom validation function
+            validate: fn command ->
+              cond do
+                length(command.items) == 0 ->
+                  {:error, "Order must contain at least one item"}
+                  
+                command.payment_method == "bitcoin" && is_nil(command.shipping_address) ->
+                  {:error, "Shipping address is required for Bitcoin payments"}
+                  
+                true -> :ok
+              end
+            end
+          }
+        ]
+      end
+      
+      # Custom middleware example 
+      command :refund_order do
+        fields [:id, :amount, :reason]
+        
+        middleware [
+          # Authorization middleware
+          {ECommerce.AuthorizationMiddleware, roles: [:admin, :customer_service]},
+          
+          # Audit middleware
+          {ECommerce.AuditMiddleware, log_level: :info, include_metadata: true},
+          
+          # Rate limiting middleware  
+          {ECommerce.RateLimitingMiddleware, max_per_minute: 5}
+        ]
+      end
+    end
+  end
+end
+```
+
+```elixir
+# Define custom middleware module
+defmodule ECommerce.AuthorizationMiddleware do
+  use AshCommanded.Commanded.Middleware.BaseMiddleware
+  
+  @impl true
+  def before_dispatch(command, context, next) do
+    # Check user roles against required roles
+    current_user = Map.get(context, :current_user, %{})
+    user_roles = Map.get(current_user, :roles, [])
+    required_roles = Map.get(context, :middleware_config, %{})
+                     |> Map.get(:roles, [])
+    
+    # If any required role is present, authorize
+    if Enum.any?(required_roles, &(&1 in user_roles)) do
+      # Authorized - continue to next middleware
+      next.(command, context)
+    else
+      # Not authorized - stop the chain
+      {:error, :unauthorized}
+    end
+  end
+end
+```
+
 ## Application Configuration
 
 ```elixir
@@ -194,6 +306,13 @@ defmodule ECommerce.Store do
   end
 
   commanded do
+    # Resource-level middleware (applies to all commands in all resources)
+    middleware [
+      AshCommanded.Commanded.Middleware.LoggingMiddleware,
+      {AshCommanded.Commanded.Middleware.ValidationMiddleware, 
+        required: [:id]}
+    ]
+    
     application do
       # Required options
       otp_app :ecommerce

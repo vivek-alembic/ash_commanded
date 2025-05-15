@@ -49,6 +49,10 @@ defmodule AshCommanded.Commanded.Sections.CommandsSection do
         type: :boolean,
         default: true,
         doc: "Whether to autogenerate a handler for this command"
+      ],
+      middleware: [
+        type: {:list, {:or, [:atom, {:tuple, [:atom, :any]}]}},
+        doc: "List of middleware to apply to this command. Each entry can be a module or {module, options} tuple."
       ]
     ],
     imports: []
@@ -60,6 +64,11 @@ defmodule AshCommanded.Commanded.Sections.CommandsSection do
         type: {:list, :any},
         default: [],
         doc: "The commands that can be performed on this resource"
+      ],
+      middleware: [
+        type: {:list, {:or, [:atom, {:tuple, [:atom, :any]}]}},
+        default: [],
+        doc: "List of middleware to apply to all commands in this resource. Each entry can be a module or {module, options} tuple."
       ]
     ]
   end

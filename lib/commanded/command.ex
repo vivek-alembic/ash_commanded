@@ -14,7 +14,8 @@ defmodule AshCommanded.Commanded.Command do
     param_mapping: map() | (map() -> map()) | (map(), struct() -> map()) | nil,
     command_name: atom() | nil,
     handler_name: atom() | nil,
-    autogenerate_handler?: boolean()
+    autogenerate_handler?: boolean(),
+    middleware: list(module() | {module(), map()})
   }
   
   defstruct [
@@ -26,6 +27,7 @@ defmodule AshCommanded.Commanded.Command do
     :param_mapping,
     :command_name,
     :handler_name,
-    autogenerate_handler?: true
+    autogenerate_handler?: true,
+    middleware: []
   ]
 end
