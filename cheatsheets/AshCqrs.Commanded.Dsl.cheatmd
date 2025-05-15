@@ -105,6 +105,81 @@ defmodule ECommerce.Customer do
 end
 ```
 
+## Event Handlers
+
+```elixir
+defmodule ECommerce.Order do
+  use Ash.Resource,
+    extensions: [AshCommanded.Commanded.Dsl]
+
+  commanded do
+    events do
+      event :order_placed do
+        fields [:id, :customer_id, :total_amount, :items]
+      end
+      
+      event :order_shipped do
+        fields [:id, :tracking_number, :shipped_at]
+      end
+      
+      event :order_cancelled do
+        fields [:id, :reason]
+      end
+    end
+    
+    event_handlers do
+      # Function-based handler for sending notifications
+      handler :order_confirmation do
+        events [:order_placed]
+        action fn event, _metadata ->
+          ECommerce.Notifications.send_order_confirmation(
+            event.customer_id, 
+            event.id,
+            event.total_amount
+          )
+          :ok
+        end
+      end
+      
+      # Shipping integration handler
+      handler :shipping_notification do
+        events [:order_shipped]
+        action fn event, _metadata ->
+          ECommerce.ShippingProvider.update_shipment(
+            event.id,
+            event.tracking_number
+          )
+          :ok
+        end
+      end
+      
+      # PubSub broadcasting handler
+      handler :event_broadcaster do
+        events [:order_placed, :order_shipped, :order_cancelled]
+        publish_to "order_events"
+      end
+      
+      # Using an Ash action as handler
+      handler :refund_order do
+        events [:order_cancelled]
+        action :process_refund
+        idempotent true
+      end
+      
+      # Custom handler module name
+      handler :analytics_tracker do
+        events [:order_placed, :order_shipped, :order_cancelled]
+        action fn event, _metadata ->
+          ECommerce.Analytics.track_event(event)
+          :ok
+        end
+        handler_name :business_intelligence_handler
+      end
+    end
+  end
+end
+```
+
 ## Application Configuration
 
 ```elixir

@@ -61,6 +61,10 @@ end
 
 ## Event Handling
 
+Events are handled in several ways in AshCommanded:
+
+### Aggregate State Updates
+
 In the aggregate module, AshCommanded generates `apply/2` functions for each event to update the aggregate state:
 
 ```elixir
@@ -84,3 +88,20 @@ defmodule ECommerce.CustomerAggregate do
   end
 end
 ```
+
+### Projections
+
+Projections transform events into resource updates, allowing you to maintain read models. See the [Projections](projections.md) documentation for details.
+
+### Event Handlers
+
+Event handlers allow you to respond to events with side effects like sending notifications or integrating with external systems. See the [Event Handlers](event_handlers.md) documentation for more information.
+
+## Choosing Between Projections and Event Handlers
+
+When deciding how to handle events, consider the following:
+
+- Use **projections** when you need to update your resource state or read models based on events
+- Use **event handlers** when you need to perform side effects like sending notifications, integrating with external systems, or publishing events to other systems
+
+You can use both together to create a complete system that maintains consistent read models while also performing necessary side effects.

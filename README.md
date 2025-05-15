@@ -31,10 +31,11 @@ mix test --cover:
 
 AshCommanded is built as a DSL extension for Ash Framework resources. Its main components are:
 
-1. **DSL Extension**: The `AshCommanded.Commanded.Dsl` module defines four main sections:
+1. **DSL Extension**: The `AshCommanded.Commanded.Dsl` module defines five main sections:
    - `commands`: Define commands that trigger state changes
    - `events`: Define events that are emitted by commands
    - `projections`: Define how events affect the resource state
+   - `event_handlers`: Define general purpose handlers for events
    - `application`: Configure Commanded application settings
 
 2. **Code Generation**: The library dynamically generates Elixir modules:
@@ -42,24 +43,27 @@ AshCommanded is built as a DSL extension for Ash Framework resources. Its main c
    - Event modules (structs with typespecs)
    - Projection modules (with event handlers)
    - Projector modules (Commanded event handlers that apply projections)
+   - Event handler modules (general purpose event subscribers)
    - Aggregate modules (for Commanded integration)
    - Router modules (for command dispatching)
-   - Commanded application modules (with projector supervision)
+   - Commanded application modules (with projector and handler supervision)
 
 3. **Transformers**: The DSL uses transformers to generate code:
    - `GenerateCommandModules`: Generates command structs
    - `GenerateEventModules`: Generates event structs
    - `GenerateProjectionModules`: Generates projection modules
    - `GenerateProjectorModules`: Generates Commanded event handlers that process events
+   - `GenerateEventHandlerModules`: Generates general purpose event handlers
    - `GenerateAggregateModule`: Generates aggregate module for Commanded
    - `GenerateDomainRouterModule`: Generates router module for each domain
    - `GenerateMainRouterModule`: Generates main application router
-   - `GenerateCommandedApplication`: Generates Commanded application with projector supervision
+   - `GenerateCommandedApplication`: Generates Commanded application with projector and handler supervision
 
 4. **Verifiers**: Validate DSL usage:
    - Command validation (names, fields, handlers, etc.)
    - Event validation (names, fields, etc.)
    - Projection validation (events, actions, changes, etc.)
+   - Event handler validation (events, actions, etc.)
 
 ## Usage Example
 
@@ -133,6 +137,24 @@ defmodule ECommerce.Customer do
         })
       end
     end
+    
+    event_handlers do
+      handler :notification_handler do
+        events [:customer_registered]
+        action fn event, _metadata ->
+          ECommerce.Notifications.send_welcome_email(event.email)
+          :ok
+        end
+      end
+      
+      handler :analytics_tracker do
+        events [:customer_registered, :email_confirmed]
+        action fn event, _metadata ->
+          ECommerce.Analytics.track(event)
+          :ok
+        end
+      end
+    end
   end
 end
 ```
@@ -142,6 +164,8 @@ This will generate:
 - `ECommerce.Events.CustomerRegistered` - Event struct
 - `ECommerce.Projections.CustomerRegistered` - Projection definition
 - `ECommerce.Projectors.CustomerProjector` - Commanded event handler for projections
+- `ECommerce.EventHandlers.CustomerNotificationHandler` - General purpose event handler
+- `ECommerce.EventHandlers.CustomerAnalyticsTrackerHandler` - General purpose event handler
 - `ECommerce.CustomerAggregate` - Aggregate module
 - `ECommerce.Store.Router` - Domain-specific router (if in an Ash.Domain)
 - `AshCommanded.Router` - Main application router
@@ -159,7 +183,7 @@ mix gen.docs
 ```
 
 The documentation includes:
-- Guides for commands, events, projections, and routers
+- Guides for commands, events, projections, event handlers, and routers
 - API reference for all modules
 - Cheatsheets for the DSL
 
@@ -328,6 +352,69 @@ Projection options:
 - `changes` - Static map or function that returns the changes to apply
 - `autogenerate?` - Set to false to disable projection generation
 
+## Event Handlers
+
+Event handlers define how to respond to domain events with side effects, integrations, notifications, or other operations. Unlike projections which focus on updating read models, event handlers are for operations that don't necessarily affect resource state.
+
+```elixir
+commanded do
+  event_handlers do
+    # Function-based handler for sending notifications
+    handler :welcome_notification do
+      events [:customer_registered]
+      action fn event, _metadata ->
+        ECommerce.Notifications.send_welcome_email(event.email)
+        :ok
+      end
+    end
+    
+    # Handler with multiple events
+    handler :analytics_tracker do
+      events [:customer_registered, :email_confirmed]
+      action fn event, _metadata ->
+        ECommerce.Analytics.track(event)
+        :ok
+      end
+    end
+    
+    # Handler using an Ash action
+    handler :external_system_sync do
+      events [:customer_registered]
+      action :sync_to_crm
+      idempotent true
+    end
+    
+    # PubSub broadcasting handler
+    handler :event_broadcaster do
+      events [:customer_registered, :email_confirmed]
+      publish_to "customer_events"
+    end
+  end
+end
+```
+
+Event handler options:
+- `events` - List of event names this handler will respond to
+- `action` - Action to perform when handling the event (atom or function)
+- `handler_name` - Override the auto-generated handler module name
+- `publish_to` - PubSub topic(s) to publish the event to
+- `idempotent` - Whether the handler is idempotent (default: false)
+- `autogenerate?` - Set to false to disable handler generation
+
+Generated event handler modules handle the specified events and execute the defined actions or functions:
+
+```elixir
+defmodule ECommerce.EventHandlers.CustomerWelcomeNotificationHandler do
+  use Commanded.Event.Handler,
+    application: ECommerce.CommandedApplication,
+    name: "ECommerce.EventHandlers.CustomerWelcomeNotificationHandler"
+  
+  def handle(%ECommerce.Events.CustomerRegistered{} = event, _metadata) do
+    ECommerce.Notifications.send_welcome_email(event.email)
+    :ok
+  end
+end
+```
 
 ## Projectors
 
